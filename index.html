@@ -14,6 +14,7 @@
         select:focus, input:focus { border-color: #b45309; outline: none; background-color: #fff; }
         .btn { width: 100%; background-color: #b45309; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
         .btn:hover { background-color: #92400e; }
+        .loading { display: none; text-align: center; color: #b45309; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -55,17 +56,21 @@
         <input type="text" id="name" placeholder="山田 太郎">
     </div>
 
-    <button class="btn" onclick="submitReservation()">予約を確定する</button>
+    <button class="btn" id="submitBtn" onclick="submitReservation()">予約を確定する</button>
+    <div class="loading" id="loadingMsg">予約を送信中...</div>
 </div>
 
 <script>
-    // 画面が開いたときに、今日以降の日付しか選べないようにする設定
+    // 先ほど控えたスプレッドシートの「ウェブアプリ URL」を以下のシングルクォーテーションの間に貼り付けてください
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyRZPtspRr7fT793KBVko2xt9sNoFalCFOsU0yX_tADdr75NyUDTk4rBqDXlwcLjEFIyQ/exec';
+
+    // 今日以降の日付しか選べないようにする設定
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('date').min = today;
 
     function submitReservation() {
         const menu = document.getElementById('menu').value;
-        const date = document.getElementById('date').date; // ※後ほど修正・連携部分
+        const date = document.getElementById('date').value;
         const time = document.getElementById('time').value;
         const name = document.getElementById('name').value;
 
@@ -74,9 +79,45 @@
             return;
         }
 
-        alert(name + '様、ご入力ありがとうございます！\n' + date + ' ' + time + '〜\n' + menu + ' で予約を受け付けます。');
-        
-        // 【ここに後ほど、前回作ったスプレッドシートのGASへデータを飛ばす処理を合体させます】
-    </script>
+        // ボタンを無効化してローディング表示
+        document.getElementById('submitBtn').style.display = 'none';
+        document.getElementById('loadingMsg').style.display = 'block';
+
+        // スプレッドシート（GAS）に送るデータの形を作る
+        const payload = {
+            sourceType: "WEB_PAGE",
+            menu: menu,
+            date: date,
+            time: time,
+            name: name
+        };
+
+        // GASへデータを送信（通信処理）
+        fetch(GAS_WEB_APP_URL, {
+            method: "POST",
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === "success") {
+                alert(name + '様、ご予約ありがとうございました！\nスプレッドシートに予約が記録されました。');
+                // 入力欄をリセット
+                document.getElementById('name').value = '';
+                document.getElementById('date').value = '';
+            } else {
+                alert('エラーが発生しました。時間を置いてやり直してください。');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('送信に失敗しました。設定を確認してください。');
+        })
+        .finally(() => {
+            // ボタンを元に戻す
+            document.getElementById('submitBtn').style.display = 'block';
+            document.getElementById('loadingMsg').style.display = 'none';
+        });
+    }
+</script>
 </body>
 </html>
