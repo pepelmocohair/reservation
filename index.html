@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サロン予約</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f9f6f0; color: #3c3a36; margin: 0; padding: 16px; display: flex; justify-content: center; }
+        .container { background-color: #ffffff; border-radius: 16px; padding: 24px; width: 100%; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h2 { text-align: center; color: #4a4740; font-size: 20px; margin-bottom: 24px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: #6e6a61; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; background-color: #fafafa; }
+        select:focus, input:focus { border-color: #b45309; outline: none; background-color: #fff; }
+        .btn { width: 100%; background-color: #b45309; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
+        .btn:hover { background-color: #92400e; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>サロン予約（テスト画面）</h2>
+    
+    <div class="form-group">
+        <label for="menu">メニューを選択</label>
+        <select id="menu">
+            <option value="メニューA：カット（1時間）">メニューA：カット（1時間）</option>
+            <option value="メニューB：カット＋カラー（2時間）">メニューB：カット＋カラー（2時間）</option>
+            <option value="メニューC：ヘッドスパ（30分）">メニューC：ヘッドスパ（30分）</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="date">ご希望の日付</label>
+        <input type="date" id="date">
+    </div>
+
+    <div class="form-group">
+        <label for="time">ご希望の時間</label>
+        <select id="time">
+            <option value="10:00">10:00</option>
+            <option value="11:00">11:00</option>
+            <option value="12:00">12:00</option>
+            <option value="13:00">13:00</option>
+            <option value="14:00">14:00</option>
+            <option value="15:00">15:00</option>
+            <option value="16:00">16:00</option>
+            <option value="17:00">17:00</option>
+            <option value="18:00">18:00</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="name">お名前（フルネーム）</label>
+        <input type="text" id="name" placeholder="山田 太郎">
+    </div>
+
+    <button class="btn" onclick="submitReservation()">予約を確定する</button>
+</div>
+
+<script>
+    // 画面が開いたときに、今日以降の日付しか選べないようにする設定
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').min = today;
+
+    function submitReservation() {
+        const menu = document.getElementById('menu').value;
+        const date = document.getElementById('date').date; // ※後ほど修正・連携部分
+        const time = document.getElementById('time').value;
+        const name = document.getElementById('name').value;
+
+        if (!date || !name) {
+            alert('日付とお名前を入力してください。');
+            return;
+        }
+
+        alert(name + '様、ご入力ありがとうございます！\n' + date + ' ' + time + '〜\n' + menu + ' で予約を受け付けます。');
+        
+        // 【ここに後ほど、前回作ったスプレッドシートのGASへデータを飛ばす処理を合体させます】
+    </script>
+</body>
+</html>
