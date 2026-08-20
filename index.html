@@ -56,6 +56,7 @@
     <option value="17:00">17:00</option>
     <option value="17:30">17:30</option>
     <option value="18:00">18:00</option>
+    <option value="18:30">18:30</option>
 </select>    </div>
 
     <div class="form-group">
@@ -94,7 +95,9 @@ function loadReservedTimes() {
 
             const reservedTimes = data.reservedTimes;
 
+            // -----------------------------
             // メニュー所要時間
+            // -----------------------------
             let durationMinutes = 60;
 
             if (menu.includes('カット＋カラー')) {
@@ -107,34 +110,69 @@ function loadReservedTimes() {
 
             const requiredSlots = durationMinutes / 30;
 
+            // -----------------------------
+            // 曜日ごとの営業時間
+            // -----------------------------
+            const selectedDate = new Date(date + 'T00:00:00');
+            const dayOfWeek = selectedDate.getDay();
+
+            // 0 = 日曜、6 = 土曜
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+            // 平日10:30、土日10:00
+            const openingTime = isWeekend ? '10:00' : '10:30';
+
+            // 営業終了
+            const closingTime = '19:00';
+
+            const openingMinutes = timeToMinutes(openingTime);
+            const closingMinutes = timeToMinutes(closingTime);
+
             const options = Array.from(timeSelect.options);
 
-            // まず全部リセット
+            // -----------------------------
+            // 全時間を一旦リセット
+            // -----------------------------
             options.forEach(option => {
                 option.disabled = false;
                 option.textContent = option.value;
             });
 
-            // 各開始時刻が予約可能か確認
+            // -----------------------------
+            // 各開始時刻を判定
+            // -----------------------------
             options.forEach((option, index) => {
+                const startMinutes = timeToMinutes(option.value);
+                const endMinutes = startMinutes + durationMinutes;
+
                 let canBook = true;
 
+                // 営業開始前
+                if (startMinutes < openingMinutes) {
+                    canBook = false;
+                }
+
+                // 営業終了を超える
+                if (endMinutes > closingMinutes) {
+                    canBook = false;
+                }
+
                 // 必要な連続枠を確認
-                for (let i = 0; i < requiredSlots; i++) {
-                    const slotIndex = index + i;
+                if (canBook) {
+                    for (let i = 0; i < requiredSlots; i++) {
+                        const slotIndex = index + i;
 
-                    // 営業時間を超える
-                    if (slotIndex >= options.length) {
-                        canBook = false;
-                        break;
-                    }
+                        if (slotIndex >= options.length) {
+                            canBook = false;
+                            break;
+                        }
 
-                    const slotTime = options[slotIndex].value;
+                        const slotTime = options[slotIndex].value;
 
-                    // 途中に既存予約がある
-                    if (reservedTimes.includes(slotTime)) {
-                        canBook = false;
-                        break;
+                        if (reservedTimes.includes(slotTime)) {
+                            canBook = false;
+                            break;
+                        }
                     }
                 }
 
@@ -144,7 +182,9 @@ function loadReservedTimes() {
                 }
             });
 
+            // -----------------------------
             // 最初の予約可能時間を自動選択
+            // -----------------------------
             const firstAvailable = options.find(option => !option.disabled);
 
             if (firstAvailable) {
@@ -157,7 +197,10 @@ function loadReservedTimes() {
             console.error('予約済み時間の取得エラー:', error);
         });
 }
-
+    function timeToMinutes(time) {
+    const parts = time.split(':');
+    return Number(parts[0]) * 60 + Number(parts[1]);
+}
     function submitReservation() {
         const menu = document.getElementById('menu').value;
         const date = document.getElementById('date').value;
