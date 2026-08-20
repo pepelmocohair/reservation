@@ -67,6 +67,54 @@
     // 今日以降の日付しか選べないようにする設定
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('date').min = today;
+    document.getElementById('date').addEventListener('change', loadReservedTimes);
+
+function loadReservedTimes() {
+    const date = document.getElementById('date').value;
+    const timeSelect = document.getElementById('time');
+
+    if (!date) return;
+
+    fetch(GAS_WEB_APP_URL + '?date=' + encodeURIComponent(date))
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                console.error('予約済み時間の取得に失敗:', data);
+                return;
+            }
+
+            // まず全時間を選択可能に戻す
+            Array.from(timeSelect.options).forEach(option => {
+                option.disabled = false;
+                option.textContent = option.value;
+            });
+
+            // 予約済み時間を選択不可にする
+            data.reservedTimes.forEach(reservedTime => {
+                const option = Array.from(timeSelect.options)
+                    .find(opt => opt.value === reservedTime);
+
+                if (option) {
+                    option.disabled = true;
+                    option.textContent = reservedTime + '（予約済み）';
+                }
+            });
+
+            // 現在選択中の時間が予約済みなら、
+            // 最初の空いている時間へ移動
+            if (timeSelect.selectedOptions[0]?.disabled) {
+                const firstAvailable = Array.from(timeSelect.options)
+                    .find(option => !option.disabled);
+
+                if (firstAvailable) {
+                    timeSelect.value = firstAvailable.value;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('予約済み時間の取得エラー:', error);
+        });
+}
 
     function submitReservation() {
         const menu = document.getElementById('menu').value;
