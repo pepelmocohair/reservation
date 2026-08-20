@@ -112,12 +112,66 @@ function loadReservedTimes() {
 
             // -----------------------------
             // 曜日ごとの営業時間
-            // -----------------------------
-            const selectedDate = new Date(date + 'T00:00:00');
-            const dayOfWeek = selectedDate.getDay();
+            // -----------------------------const selectedDate = new Date(date + 'T00:00:00');
+const dayOfWeek = selectedDate.getDay();
+const dayOfMonth = selectedDate.getDate();
 
-            // 0 = 日曜、6 = 土曜
-            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+// 0 = 日曜、6 = 土曜
+const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+// 毎週月曜日
+const isMonday = dayOfWeek === 1;
+
+// -----------------------------
+// 第1・第3日曜日を判定
+// -----------------------------
+
+// 日付から「第何週の日曜日か」を計算
+const weekNumber = Math.ceil(dayOfMonth / 7);
+
+const isFirstOrThirdSunday =
+    dayOfWeek === 0 &&
+    (weekNumber === 1 || weekNumber === 3);
+
+// -----------------------------
+// 定休日判定
+// -----------------------------
+
+const isRegularHoliday =
+    isMonday ||
+    isFirstOrThirdSunday;
+
+// スプレッドシートの営業日設定を最優先
+const isClosed =
+    data.businessDayOverride === '休業' ||
+    (
+        isRegularHoliday &&
+        data.businessDayOverride !== '営業'
+    );
+
+if (isClosed) {
+    const options = Array.from(timeSelect.options);
+
+    options.forEach(option => {
+        option.disabled = true;
+        option.textContent = option.value + '（定休日）';
+    });
+
+    timeSelect.selectedIndex = -1;
+    return;
+}
+
+if (isClosed) {
+    const options = Array.from(timeSelect.options);
+
+    options.forEach(option => {
+        option.disabled = true;
+        option.textContent = option.value + '（定休日）';
+    });
+
+    timeSelect.selectedIndex = -1;
+    return;
+}
 
             // 平日10:30、土日10:00
             const openingTime = isWeekend ? '10:00' : '10:30';
