@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>サロン予約</title>
 
     <style>
@@ -109,10 +110,12 @@
 
     <div id="notice" class="notice"></div>
 
+
     <div class="form-group">
         <label for="menu">メニューを選択</label>
 
         <select id="menu">
+
             <option value="メニューA：カット（60分）">
                 メニューA：カット（60分）
             </option>
@@ -124,13 +127,18 @@
             <option value="メニューC：ヘッドスパ（30分）">
                 メニューC：ヘッドスパ（30分）
             </option>
+
         </select>
     </div>
 
 
     <div class="form-group">
         <label for="date">ご希望の日付</label>
-        <input type="date" id="date">
+
+        <input
+            type="date"
+            id="date"
+        >
     </div>
 
 
@@ -189,6 +197,7 @@
         予約を確定する
     </button>
 
+
     <div
         class="loading"
         id="loadingMsg"
@@ -201,9 +210,17 @@
 
 <script>
 
+// ==================================================
+// GAS URL
+// ==================================================
+
 const GAS_WEB_APP_URL =
     'https://script.google.com/macros/s/AKfycbyRZPtspRr7fT793KBVko2xt9sNoFalCFOsU0yX_tADdr75NyUDTk4rBqDXlwcLjEFIyQ/exec';
 
+
+// ==================================================
+// DOM
+// ==================================================
 
 const dateInput =
     document.getElementById('date');
@@ -227,25 +244,29 @@ const notice =
     document.getElementById('notice');
 
 
-// ------------------------------------------
+// ==================================================
 // 今日以降だけ選択可能
-// ------------------------------------------
+// ==================================================
 
 const now = new Date();
 
 const today =
     now.getFullYear()
     + '-'
-    + String(now.getMonth() + 1).padStart(2, '0')
+    + String(
+        now.getMonth() + 1
+    ).padStart(2, '0')
     + '-'
-    + String(now.getDate()).padStart(2, '0');
+    + String(
+        now.getDate()
+    ).padStart(2, '0');
 
 dateInput.min = today;
 
 
-// ------------------------------------------
+// ==================================================
 // イベント
-// ------------------------------------------
+// ==================================================
 
 dateInput.addEventListener(
     'change',
@@ -263,36 +284,54 @@ submitBtn.addEventListener(
 );
 
 
-// ------------------------------------------
-// 時刻 → 分
-// ------------------------------------------
+// ==================================================
+// HH:mm → 分
+// ==================================================
 
 function timeToMinutes(time) {
 
-    const parts = time.split(':');
+    const parts =
+        String(time).split(':');
 
     return (
         Number(parts[0]) * 60
-        + Number(parts[1])
+        +
+        Number(parts[1])
     );
 }
 
 
-// ------------------------------------------
+// ==================================================
 // メニュー所要時間
-// ------------------------------------------
+// ※ 現在はHTML側でも空き枠表示に使用
+// ==================================================
 
 function getMenuDuration(menu) {
 
-    if (menu.includes('カット＋カラー')) {
+    const text =
+        String(menu);
+
+    if (
+        text.includes(
+            'カット＋カラー'
+        )
+    ) {
         return 120;
     }
 
-    if (menu.includes('ヘッドスパ')) {
+    if (
+        text.includes(
+            'ヘッドスパ'
+        )
+    ) {
         return 30;
     }
 
-    if (menu.includes('カット')) {
+    if (
+        text.includes(
+            'カット'
+        )
+    ) {
         return 60;
     }
 
@@ -300,52 +339,34 @@ function getMenuDuration(menu) {
 }
 
 
-// ------------------------------------------
-// 定休日判定
-// ------------------------------------------
+// ==================================================
+// 時間欄を初期状態に戻す
+// ==================================================
 
-function isRegularHoliday(date) {
+function resetTimeOptions() {
 
-    const selectedDate =
-        new Date(date + 'T00:00:00');
+    const options =
+        Array.from(
+            timeSelect.options
+        );
 
-    const dayOfWeek =
-        selectedDate.getDay();
+    options.forEach(option => {
 
-    const dayOfMonth =
-        selectedDate.getDate();
+        option.disabled =
+            false;
 
+        option.textContent =
+            option.value;
 
-    // 毎週月曜日
-    if (dayOfWeek === 1) {
-        return true;
-    }
+    });
 
-
-    // 第1・第3日曜日
-    const weekNumber =
-        Math.ceil(dayOfMonth / 7);
-
-    if (
-        dayOfWeek === 0
-        &&
-        (
-            weekNumber === 1
-            ||
-            weekNumber === 3
-        )
-    ) {
-        return true;
-    }
-
-
-    return false;
+    return options;
 }
 
 
-// ------------------------------------------
-// 空き時間取得
-// ------------------------------------------
+// ==================================================
+// 指定日の空き時間取得
+// ==================================================
 
 function loadReservedTimes() {
 
@@ -356,9 +377,11 @@ function loadReservedTimes() {
         menuSelect.value;
 
 
-    notice.style.display = 'none';
+    notice.style.display =
+        'none';
 
-    submitBtn.disabled = false;
+    submitBtn.disabled =
+        false;
 
 
     if (!date) {
@@ -378,10 +401,14 @@ function loadReservedTimes() {
 
     .then(data => {
 
-        if (data.status !== 'success') {
+        if (
+            data.status
+            !==
+            'success'
+        ) {
 
             console.error(
-                '予約状況取得エラー',
+                '予約状況取得エラー:',
                 data
             );
 
@@ -391,60 +418,27 @@ function loadReservedTimes() {
             notice.style.display =
                 'block';
 
+            submitBtn.disabled =
+                true;
+
             return;
         }
 
 
         const options =
-            Array.from(
-                timeSelect.options
-            );
+            resetTimeOptions();
 
 
-        // ----------------------------------
-        // 一旦すべてリセット
-        // ----------------------------------
+        // ------------------------------------------
+        // GASが「休業日」と判定した場合
+        // ------------------------------------------
 
-        options.forEach(option => {
-
-            option.disabled = false;
-
-            option.textContent =
-                option.value;
-
-        });
-
-
-        // ----------------------------------
-        // 定休日判定
-        // ----------------------------------
-
-        const regularHoliday =
-            isRegularHoliday(date);
-
-
-        const businessOverride =
-            data.businessDayOverride;
-
-
-        const isClosed =
-
-            businessOverride === '休業'
-
-            ||
-
-            (
-                regularHoliday
-                &&
-                businessOverride !== '営業'
-            );
-
-
-        if (isClosed) {
+        if (data.isClosed === true) {
 
             options.forEach(option => {
 
-                option.disabled = true;
+                option.disabled =
+                    true;
 
                 option.textContent =
                     option.value
@@ -452,56 +446,55 @@ function loadReservedTimes() {
 
             });
 
-
             timeSelect.selectedIndex =
                 -1;
-
 
             notice.textContent =
                 'この日は定休日です。';
 
-
             notice.style.display =
                 'block';
 
-
             submitBtn.disabled =
                 true;
-
 
             return;
         }
 
 
-        // ----------------------------------
-        // 営業時間
-        // ----------------------------------
-
-        const selectedDate =
-            new Date(
-                date + 'T00:00:00'
-            );
-
-        const dayOfWeek =
-            selectedDate.getDay();
-
-
-        // 土日は10:00
-        // 平日は10:30
-        const isWeekend =
-            dayOfWeek === 0
-            ||
-            dayOfWeek === 6;
-
+        // ------------------------------------------
+        // GASから営業時間取得
+        // ------------------------------------------
 
         const openingTime =
-            isWeekend
-            ? '10:00'
-            : '10:30';
-
+            data.openingTime;
 
         const closingTime =
-            '19:00';
+            data.closingTime;
+
+
+        if (
+            !openingTime
+            ||
+            !closingTime
+        ) {
+
+            console.error(
+                '営業時間データがありません:',
+                data
+            );
+
+            notice.textContent =
+                '営業時間を取得できませんでした。';
+
+            notice.style.display =
+                'block';
+
+            submitBtn.disabled =
+                true;
+
+            return;
+        }
 
 
         const openingMinutes =
@@ -509,32 +502,40 @@ function loadReservedTimes() {
                 openingTime
             );
 
-
         const closingMinutes =
             timeToMinutes(
                 closingTime
             );
 
 
-        // ----------------------------------
+        // ------------------------------------------
         // メニュー所要時間
-        // ----------------------------------
+        // ------------------------------------------
 
         const durationMinutes =
             getMenuDuration(menu);
 
-
         const requiredSlots =
-            durationMinutes / 30;
+            Math.ceil(
+                durationMinutes / 30
+            );
 
+
+        // ------------------------------------------
+        // 予約済み時間
+        // ------------------------------------------
 
         const reservedTimes =
-            data.reservedTimes || [];
+            Array.isArray(
+                data.reservedTimes
+            )
+            ? data.reservedTimes
+            : [];
 
 
-        // ----------------------------------
-        // 各開始時刻を判定
-        // ----------------------------------
+        // ------------------------------------------
+        // 各開始時間を判定
+        // ------------------------------------------
 
         options.forEach(
             (option, index) => {
@@ -544,13 +545,14 @@ function loadReservedTimes() {
                         option.value
                     );
 
-
                 const endMinutes =
                     startMinutes
-                    + durationMinutes;
+                    +
+                    durationMinutes;
 
 
-                let canBook = true;
+                let canBook =
+                    true;
 
 
                 // 営業開始前
@@ -559,7 +561,10 @@ function loadReservedTimes() {
                     <
                     openingMinutes
                 ) {
-                    canBook = false;
+
+                    canBook =
+                        false;
+
                 }
 
 
@@ -569,11 +574,15 @@ function loadReservedTimes() {
                     >
                     closingMinutes
                 ) {
-                    canBook = false;
+
+                    canBook =
+                        false;
+
                 }
 
 
-                // 必要な連続枠を確認
+                // 必要な連続枠に
+                // 予約が入っていないか確認
                 if (canBook) {
 
                     for (
@@ -592,7 +601,8 @@ function loadReservedTimes() {
                             options.length
                         ) {
 
-                            canBook = false;
+                            canBook =
+                                false;
 
                             break;
                         }
@@ -610,7 +620,8 @@ function loadReservedTimes() {
                             )
                         ) {
 
-                            canBook = false;
+                            canBook =
+                                false;
 
                             break;
                         }
@@ -635,9 +646,9 @@ function loadReservedTimes() {
         );
 
 
-        // ----------------------------------
-        // 最初の予約可能時刻へ
-        // ----------------------------------
+        // ------------------------------------------
+        // 最初の予約可能時間を自動選択
+        // ------------------------------------------
 
         const firstAvailable =
             options.find(
@@ -675,26 +686,27 @@ function loadReservedTimes() {
     .catch(error => {
 
         console.error(
-            '予約状況取得エラー',
+            '予約状況取得エラー:',
             error
         );
-
 
         notice.textContent =
             '予約状況を取得できませんでした。';
 
-
         notice.style.display =
             'block';
+
+        submitBtn.disabled =
+            true;
 
     });
 
 }
 
 
-// ------------------------------------------
+// ==================================================
 // 予約送信
-// ------------------------------------------
+// ==================================================
 
 function submitReservation() {
 
@@ -758,7 +770,8 @@ function submitReservation() {
         GAS_WEB_APP_URL,
         {
 
-            method: 'POST',
+            method:
+                'POST',
 
             body:
                 JSON.stringify(
@@ -774,6 +787,10 @@ function submitReservation() {
 
     .then(data => {
 
+        // ------------------------------------------
+        // 成功
+        // ------------------------------------------
+
         if (
             data.status
             ===
@@ -786,17 +803,20 @@ function submitReservation() {
                 + '予約が確定しました。'
             );
 
-
             nameInput.value =
                 '';
 
-
             loadReservedTimes();
 
+            return;
         }
 
 
-        else if (
+        // ------------------------------------------
+        // 予約競合
+        // ------------------------------------------
+
+        if (
             data.status
             ===
             'conflict'
@@ -804,17 +824,21 @@ function submitReservation() {
 
             alert(
                 '申し訳ありません。\n'
-                + 'その時間は直前に予約が入りました。\n'
+                + 'その時間帯は直前に予約が入りました。\n'
                 + '別の時間をお選びください。'
             );
 
-
             loadReservedTimes();
 
+            return;
         }
 
 
-        else if (
+        // ------------------------------------------
+        // 定休日
+        // ------------------------------------------
+
+        if (
             data.status
             ===
             'closed'
@@ -826,26 +850,47 @@ function submitReservation() {
                 + '別の日をお選びください。'
             );
 
+            loadReservedTimes();
+
+            return;
+        }
+
+
+        // ------------------------------------------
+        // 営業時間外
+        // ------------------------------------------
+
+        if (
+            data.status
+            ===
+            'outside_hours'
+        ) {
+
+            alert(
+                '申し訳ありません。\n'
+                + 'その時間は営業時間外です。\n'
+                + '別の時間をお選びください。'
+            );
 
             loadReservedTimes();
 
+            return;
         }
 
 
-        else {
+        // ------------------------------------------
+        // その他エラー
+        // ------------------------------------------
 
-            console.error(
-                'GAS error:',
-                data
-            );
+        console.error(
+            'GAS error:',
+            data
+        );
 
-
-            alert(
-                '予約処理中にエラーが発生しました。\n'
-                + '時間を置いてもう一度お試しください。'
-            );
-
-        }
+        alert(
+            '予約処理中にエラーが発生しました。\n'
+            + '時間を置いてもう一度お試しください。'
+        );
 
     })
 
@@ -855,7 +900,6 @@ function submitReservation() {
             '送信エラー:',
             error
         );
-
 
         alert(
             '送信に失敗しました。\n'
