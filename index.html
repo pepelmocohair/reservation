@@ -147,16 +147,36 @@ function loadReservedTimes() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === "success") {
-                alert(name + '様、ご予約ありがとうございました！\nスプレッドシートに予約が記録されました。');
-                // 入力欄をリセット
-                document.getElementById('name').value = '';
-                document.getElementById('date').value = '';
-            } else {
-                alert('エラーが発生しました。時間を置いてやり直してください。');
-            }
-        })
-        .catch(error => {
+
+    if (data.status === "success") {
+
+        alert(
+            name + '様、ご予約ありがとうございました！\n予約が確定しました。'
+        );
+
+        document.getElementById('name').value = '';
+
+        // 同じ日付のまま空き時間を再取得
+        loadReservedTimes();
+
+    } else if (data.status === "conflict") {
+
+        alert(
+            '申し訳ありません。\nその時間は直前に予約が入りました。\n別の時間をお選びください。'
+        );
+
+        // 最新の予約状況を取り直す
+        loadReservedTimes();
+
+    } else {
+
+        alert(
+            '予約処理中にエラーが発生しました。\n時間を置いてもう一度お試しください。'
+        );
+
+        console.error('GAS error:', data);
+    }
+}).catch(error => {
             console.error('Error:', error);
             alert('送信に失敗しました。設定を確認してください。');
         })
