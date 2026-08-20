@@ -75,9 +75,11 @@
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('date').min = today;
     document.getElementById('date').addEventListener('change', loadReservedTimes);
+    document.getElementById('menu').addEventListener('change', loadReservedTimes);
 
 function loadReservedTimes() {
     const date = document.getElementById('date').value;
+    const menu = document.getElementById('menu').value;
     const timeSelect = document.getElementById('time');
 
     if (!date) return;
@@ -90,32 +92,65 @@ function loadReservedTimes() {
                 return;
             }
 
-            // まず全時間を選択可能に戻す
-            Array.from(timeSelect.options).forEach(option => {
+            const reservedTimes = data.reservedTimes;
+
+            // メニュー所要時間
+            let durationMinutes = 60;
+
+            if (menu.includes('カット＋カラー')) {
+                durationMinutes = 120;
+            } else if (menu.includes('ヘッドスパ')) {
+                durationMinutes = 30;
+            } else if (menu.includes('カット')) {
+                durationMinutes = 60;
+            }
+
+            const requiredSlots = durationMinutes / 30;
+
+            const options = Array.from(timeSelect.options);
+
+            // まず全部リセット
+            options.forEach(option => {
                 option.disabled = false;
                 option.textContent = option.value;
             });
 
-            // 予約済み時間を選択不可にする
-            data.reservedTimes.forEach(reservedTime => {
-                const option = Array.from(timeSelect.options)
-                    .find(opt => opt.value === reservedTime);
+            // 各開始時刻が予約可能か確認
+            options.forEach((option, index) => {
+                let canBook = true;
 
-                if (option) {
+                // 必要な連続枠を確認
+                for (let i = 0; i < requiredSlots; i++) {
+                    const slotIndex = index + i;
+
+                    // 営業時間を超える
+                    if (slotIndex >= options.length) {
+                        canBook = false;
+                        break;
+                    }
+
+                    const slotTime = options[slotIndex].value;
+
+                    // 途中に既存予約がある
+                    if (reservedTimes.includes(slotTime)) {
+                        canBook = false;
+                        break;
+                    }
+                }
+
+                if (!canBook) {
                     option.disabled = true;
-                    option.textContent = reservedTime + '（予約済み）';
+                    option.textContent = option.value + '（予約不可）';
                 }
             });
 
-            // 現在選択中の時間が予約済みなら、
-            // 最初の空いている時間へ移動
-            if (timeSelect.selectedOptions[0]?.disabled) {
-                const firstAvailable = Array.from(timeSelect.options)
-                    .find(option => !option.disabled);
+            // 最初の予約可能時間を自動選択
+            const firstAvailable = options.find(option => !option.disabled);
 
-                if (firstAvailable) {
-                    timeSelect.value = firstAvailable.value;
-                }
+            if (firstAvailable) {
+                timeSelect.value = firstAvailable.value;
+            } else {
+                timeSelect.selectedIndex = -1;
             }
         })
         .catch(error => {
