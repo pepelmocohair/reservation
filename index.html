@@ -4,327 +4,879 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>サロン予約</title>
+
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f9f6f0; color: #3c3a36; margin: 0; padding: 16px; display: flex; justify-content: center; }
-        .container { background-color: #ffffff; border-radius: 16px; padding: 24px; width: 100%; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        h2 { text-align: center; color: #4a4740; font-size: 20px; margin-bottom: 24px; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: #6e6a61; }
-        select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; background-color: #fafafa; }
-        select:focus, input:focus { border-color: #b45309; outline: none; background-color: #fff; }
-        .btn { width: 100%; background-color: #b45309; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
-        .btn:hover { background-color: #92400e; }
-        .loading { display: none; text-align: center; color: #b45309; font-weight: bold; margin-top: 10px; }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f9f6f0;
+            color: #3c3a36;
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        h2 {
+            text-align: center;
+            color: #4a4740;
+            font-size: 20px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #6e6a61;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            background-color: #fafafa;
+        }
+
+        select:focus,
+        input:focus {
+            border-color: #b45309;
+            outline: none;
+            background-color: #fff;
+        }
+
+        .btn {
+            width: 100%;
+            background-color: #b45309;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn:disabled {
+            background-color: #bbb;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #b45309;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .notice {
+            display: none;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: #f5f5f5;
+            color: #6e6a61;
+            font-size: 14px;
+            text-align: center;
+        }
     </style>
 </head>
+
 <body>
 
 <div class="container">
+
     <h2>サロン予約（テスト画面）</h2>
-    
+
+    <div id="notice" class="notice"></div>
+
     <div class="form-group">
         <label for="menu">メニューを選択</label>
+
         <select id="menu">
-    <option value="メニューA：カット（60分）">メニューA：カット（60分）</option>
-    <option value="メニューB：カット＋カラー（120分）">メニューB：カット＋カラー（120分）</option>
-    <option value="メニューC：ヘッドスパ（30分）">メニューC：ヘッドスパ（30分）</option>
-</select>
+            <option value="メニューA：カット（60分）">
+                メニューA：カット（60分）
+            </option>
+
+            <option value="メニューB：カット＋カラー（120分）">
+                メニューB：カット＋カラー（120分）
+            </option>
+
+            <option value="メニューC：ヘッドスパ（30分）">
+                メニューC：ヘッドスパ（30分）
+            </option>
+        </select>
     </div>
+
 
     <div class="form-group">
         <label for="date">ご希望の日付</label>
         <input type="date" id="date">
     </div>
 
+
     <div class="form-group">
         <label for="time">ご希望の時間</label>
+
         <select id="time">
-    <option value="10:00">10:00</option>
-    <option value="10:30">10:30</option>
-    <option value="11:00">11:00</option>
-    <option value="11:30">11:30</option>
-    <option value="12:00">12:00</option>
-    <option value="12:30">12:30</option>
-    <option value="13:00">13:00</option>
-    <option value="13:30">13:30</option>
-    <option value="14:00">14:00</option>
-    <option value="14:30">14:30</option>
-    <option value="15:00">15:00</option>
-    <option value="15:30">15:30</option>
-    <option value="16:00">16:00</option>
-    <option value="16:30">16:30</option>
-    <option value="17:00">17:00</option>
-    <option value="17:30">17:30</option>
-    <option value="18:00">18:00</option>
-    <option value="18:30">18:30</option>
-</select>    </div>
+
+            <option value="10:00">10:00</option>
+            <option value="10:30">10:30</option>
+
+            <option value="11:00">11:00</option>
+            <option value="11:30">11:30</option>
+
+            <option value="12:00">12:00</option>
+            <option value="12:30">12:30</option>
+
+            <option value="13:00">13:00</option>
+            <option value="13:30">13:30</option>
+
+            <option value="14:00">14:00</option>
+            <option value="14:30">14:30</option>
+
+            <option value="15:00">15:00</option>
+            <option value="15:30">15:30</option>
+
+            <option value="16:00">16:00</option>
+            <option value="16:30">16:30</option>
+
+            <option value="17:00">17:00</option>
+            <option value="17:30">17:30</option>
+
+            <option value="18:00">18:00</option>
+            <option value="18:30">18:30</option>
+
+        </select>
+    </div>
+
 
     <div class="form-group">
         <label for="name">お名前（フルネーム）</label>
-        <input type="text" id="name" placeholder="山田 太郎">
+
+        <input
+            type="text"
+            id="name"
+            placeholder="山田 太郎"
+        >
     </div>
 
-    <button class="btn" id="submitBtn" onclick="submitReservation()">予約を確定する</button>
-    <div class="loading" id="loadingMsg">予約を送信中...</div>
+
+    <button
+        class="btn"
+        id="submitBtn"
+        type="button"
+    >
+        予約を確定する
+    </button>
+
+    <div
+        class="loading"
+        id="loadingMsg"
+    >
+        予約を送信中...
+    </div>
+
 </div>
 
-<script>
-    // 先ほど控えたスプレッドシートの「ウェブアプリ URL」を以下のシングルクォーテーションの間に貼り付けてください
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyRZPtspRr7fT793KBVko2xt9sNoFalCFOsU0yX_tADdr75NyUDTk4rBqDXlwcLjEFIyQ/exec';
 
-    // 今日以降の日付しか選べないようにする設定
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('date').min = today;
-    document.getElementById('date').addEventListener('change', loadReservedTimes);
-    document.getElementById('menu').addEventListener('change', loadReservedTimes);
+<script>
+
+const GAS_WEB_APP_URL =
+    'https://script.google.com/macros/s/AKfycbyRZPtspRr7fT793KBVko2xt9sNoFalCFOsU0yX_tADdr75NyUDTk4rBqDXlwcLjEFIyQ/exec';
+
+
+const dateInput =
+    document.getElementById('date');
+
+const menuSelect =
+    document.getElementById('menu');
+
+const timeSelect =
+    document.getElementById('time');
+
+const nameInput =
+    document.getElementById('name');
+
+const submitBtn =
+    document.getElementById('submitBtn');
+
+const loadingMsg =
+    document.getElementById('loadingMsg');
+
+const notice =
+    document.getElementById('notice');
+
+
+// ------------------------------------------
+// 今日以降だけ選択可能
+// ------------------------------------------
+
+const now = new Date();
+
+const today =
+    now.getFullYear()
+    + '-'
+    + String(now.getMonth() + 1).padStart(2, '0')
+    + '-'
+    + String(now.getDate()).padStart(2, '0');
+
+dateInput.min = today;
+
+
+// ------------------------------------------
+// イベント
+// ------------------------------------------
+
+dateInput.addEventListener(
+    'change',
+    loadReservedTimes
+);
+
+menuSelect.addEventListener(
+    'change',
+    loadReservedTimes
+);
+
+submitBtn.addEventListener(
+    'click',
+    submitReservation
+);
+
+
+// ------------------------------------------
+// 時刻 → 分
+// ------------------------------------------
+
+function timeToMinutes(time) {
+
+    const parts = time.split(':');
+
+    return (
+        Number(parts[0]) * 60
+        + Number(parts[1])
+    );
+}
+
+
+// ------------------------------------------
+// メニュー所要時間
+// ------------------------------------------
+
+function getMenuDuration(menu) {
+
+    if (menu.includes('カット＋カラー')) {
+        return 120;
+    }
+
+    if (menu.includes('ヘッドスパ')) {
+        return 30;
+    }
+
+    if (menu.includes('カット')) {
+        return 60;
+    }
+
+    return 60;
+}
+
+
+// ------------------------------------------
+// 定休日判定
+// ------------------------------------------
+
+function isRegularHoliday(date) {
+
+    const selectedDate =
+        new Date(date + 'T00:00:00');
+
+    const dayOfWeek =
+        selectedDate.getDay();
+
+    const dayOfMonth =
+        selectedDate.getDate();
+
+
+    // 毎週月曜日
+    if (dayOfWeek === 1) {
+        return true;
+    }
+
+
+    // 第1・第3日曜日
+    const weekNumber =
+        Math.ceil(dayOfMonth / 7);
+
+    if (
+        dayOfWeek === 0
+        &&
+        (
+            weekNumber === 1
+            ||
+            weekNumber === 3
+        )
+    ) {
+        return true;
+    }
+
+
+    return false;
+}
+
+
+// ------------------------------------------
+// 空き時間取得
+// ------------------------------------------
 
 function loadReservedTimes() {
-    const date = document.getElementById('date').value;
-    const menu = document.getElementById('menu').value;
-    const timeSelect = document.getElementById('time');
 
-    if (!date) return;
+    const date =
+        dateInput.value;
 
-    fetch(GAS_WEB_APP_URL + '?date=' + encodeURIComponent(date))
-        .then(response => response.json())
-        .then(data => {
-            if (data.status !== 'success') {
-                console.error('予約済み時間の取得に失敗:', data);
-                return;
-            }
+    const menu =
+        menuSelect.value;
 
-            const reservedTimes = data.reservedTimes;
 
-            // -----------------------------
-            // メニュー所要時間
-            // -----------------------------
-            let durationMinutes = 60;
+    notice.style.display = 'none';
 
-            if (menu.includes('カット＋カラー')) {
-                durationMinutes = 120;
-            } else if (menu.includes('ヘッドスパ')) {
-                durationMinutes = 30;
-            } else if (menu.includes('カット')) {
-                durationMinutes = 60;
-            }
+    submitBtn.disabled = false;
 
-            const requiredSlots = durationMinutes / 30;
 
-            // -----------------------------
-            // 曜日ごとの営業時間
-            // -----------------------------const selectedDate = new Date(date + 'T00:00:00');
-const dayOfWeek = selectedDate.getDay();
-const dayOfMonth = selectedDate.getDate();
+    if (!date) {
+        return;
+    }
 
-// 0 = 日曜、6 = 土曜
-const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-// 毎週月曜日
-const isMonday = dayOfWeek === 1;
+    fetch(
+        GAS_WEB_APP_URL
+        + '?date='
+        + encodeURIComponent(date)
+    )
 
-// -----------------------------
-// 第1・第3日曜日を判定
-// -----------------------------
+    .then(response =>
+        response.json()
+    )
 
-// 日付から「第何週の日曜日か」を計算
-const weekNumber = Math.ceil(dayOfMonth / 7);
+    .then(data => {
 
-const isFirstOrThirdSunday =
-    dayOfWeek === 0 &&
-    (weekNumber === 1 || weekNumber === 3);
+        if (data.status !== 'success') {
 
-// -----------------------------
-// 定休日判定
-// -----------------------------
+            console.error(
+                '予約状況取得エラー',
+                data
+            );
 
-const isRegularHoliday =
-    isMonday ||
-    isFirstOrThirdSunday;
+            notice.textContent =
+                '予約状況を取得できませんでした。';
 
-// スプレッドシートの営業日設定を最優先
-const isClosed =
-    data.businessDayOverride === '休業' ||
-    (
-        isRegularHoliday &&
-        data.businessDayOverride !== '営業'
-    );
+            notice.style.display =
+                'block';
 
-if (isClosed) {
-    const options = Array.from(timeSelect.options);
-
-    options.forEach(option => {
-        option.disabled = true;
-        option.textContent = option.value + '（定休日）';
-    });
-
-    timeSelect.selectedIndex = -1;
-    return;
-}
-
-if (isClosed) {
-    const options = Array.from(timeSelect.options);
-
-    options.forEach(option => {
-        option.disabled = true;
-        option.textContent = option.value + '（定休日）';
-    });
-
-    timeSelect.selectedIndex = -1;
-    return;
-}
-
-            // 平日10:30、土日10:00
-            const openingTime = isWeekend ? '10:00' : '10:30';
-
-            // 営業終了
-            const closingTime = '19:00';
-
-            const openingMinutes = timeToMinutes(openingTime);
-            const closingMinutes = timeToMinutes(closingTime);
-
-            const options = Array.from(timeSelect.options);
-
-            // -----------------------------
-            // 全時間を一旦リセット
-            // -----------------------------
-            options.forEach(option => {
-                option.disabled = false;
-                option.textContent = option.value;
-            });
-
-            // -----------------------------
-            // 各開始時刻を判定
-            // -----------------------------
-            options.forEach((option, index) => {
-                const startMinutes = timeToMinutes(option.value);
-                const endMinutes = startMinutes + durationMinutes;
-
-                let canBook = true;
-
-                // 営業開始前
-                if (startMinutes < openingMinutes) {
-                    canBook = false;
-                }
-
-                // 営業終了を超える
-                if (endMinutes > closingMinutes) {
-                    canBook = false;
-                }
-
-                // 必要な連続枠を確認
-                if (canBook) {
-                    for (let i = 0; i < requiredSlots; i++) {
-                        const slotIndex = index + i;
-
-                        if (slotIndex >= options.length) {
-                            canBook = false;
-                            break;
-                        }
-
-                        const slotTime = options[slotIndex].value;
-
-                        if (reservedTimes.includes(slotTime)) {
-                            canBook = false;
-                            break;
-                        }
-                    }
-                }
-
-                if (!canBook) {
-                    option.disabled = true;
-                    option.textContent = option.value + '（予約不可）';
-                }
-            });
-
-            // -----------------------------
-            // 最初の予約可能時間を自動選択
-            // -----------------------------
-            const firstAvailable = options.find(option => !option.disabled);
-
-            if (firstAvailable) {
-                timeSelect.value = firstAvailable.value;
-            } else {
-                timeSelect.selectedIndex = -1;
-            }
-        })
-        .catch(error => {
-            console.error('予約済み時間の取得エラー:', error);
-        });
-}
-    function timeToMinutes(time) {
-    const parts = time.split(':');
-    return Number(parts[0]) * 60 + Number(parts[1]);
-}
-    function submitReservation() {
-        const menu = document.getElementById('menu').value;
-        const date = document.getElementById('date').value;
-        const time = document.getElementById('time').value;
-        const name = document.getElementById('name').value;
-
-        if (!date || !name) {
-            alert('日付とお名前を入力してください。');
             return;
         }
 
-        // ボタンを無効化してローディング表示
-        document.getElementById('submitBtn').style.display = 'none';
-        document.getElementById('loadingMsg').style.display = 'block';
 
-        // スプレッドシート（GAS）に送るデータの形を作る
-        const payload = {
-            sourceType: "WEB_PAGE",
-            menu: menu,
-            date: date,
-            time: time,
-            name: name
-        };
+        const options =
+            Array.from(
+                timeSelect.options
+            );
 
-        // GASへデータを送信（通信処理）
-        fetch(GAS_WEB_APP_URL, {
-            method: "POST",
-            body: JSON.stringify(payload)
-        })
-        .then(response => response.json())
-        .then(data => {
 
-    if (data.status === "success") {
+        // ----------------------------------
+        // 一旦すべてリセット
+        // ----------------------------------
 
-        alert(
-            name + '様、ご予約ありがとうございました！\n予約が確定しました。'
-        );
+        options.forEach(option => {
 
-        document.getElementById('name').value = '';
+            option.disabled = false;
 
-        // 同じ日付のまま空き時間を再取得
-        loadReservedTimes();
+            option.textContent =
+                option.value;
 
-    } else if (data.status === "conflict") {
-
-        alert(
-            '申し訳ありません。\nその時間は直前に予約が入りました。\n別の時間をお選びください。'
-        );
-
-        // 最新の予約状況を取り直す
-        loadReservedTimes();
-
-    } else {
-
-        alert(
-            '予約処理中にエラーが発生しました。\n時間を置いてもう一度お試しください。'
-        );
-
-        console.error('GAS error:', data);
-    }
-}).catch(error => {
-            console.error('Error:', error);
-            alert('送信に失敗しました。設定を確認してください。');
-        })
-        .finally(() => {
-            // ボタンを元に戻す
-            document.getElementById('submitBtn').style.display = 'block';
-            document.getElementById('loadingMsg').style.display = 'none';
         });
+
+
+        // ----------------------------------
+        // 定休日判定
+        // ----------------------------------
+
+        const regularHoliday =
+            isRegularHoliday(date);
+
+
+        const businessOverride =
+            data.businessDayOverride;
+
+
+        const isClosed =
+
+            businessOverride === '休業'
+
+            ||
+
+            (
+                regularHoliday
+                &&
+                businessOverride !== '営業'
+            );
+
+
+        if (isClosed) {
+
+            options.forEach(option => {
+
+                option.disabled = true;
+
+                option.textContent =
+                    option.value
+                    + '（定休日）';
+
+            });
+
+
+            timeSelect.selectedIndex =
+                -1;
+
+
+            notice.textContent =
+                'この日は定休日です。';
+
+
+            notice.style.display =
+                'block';
+
+
+            submitBtn.disabled =
+                true;
+
+
+            return;
+        }
+
+
+        // ----------------------------------
+        // 営業時間
+        // ----------------------------------
+
+        const selectedDate =
+            new Date(
+                date + 'T00:00:00'
+            );
+
+        const dayOfWeek =
+            selectedDate.getDay();
+
+
+        // 土日は10:00
+        // 平日は10:30
+        const isWeekend =
+            dayOfWeek === 0
+            ||
+            dayOfWeek === 6;
+
+
+        const openingTime =
+            isWeekend
+            ? '10:00'
+            : '10:30';
+
+
+        const closingTime =
+            '19:00';
+
+
+        const openingMinutes =
+            timeToMinutes(
+                openingTime
+            );
+
+
+        const closingMinutes =
+            timeToMinutes(
+                closingTime
+            );
+
+
+        // ----------------------------------
+        // メニュー所要時間
+        // ----------------------------------
+
+        const durationMinutes =
+            getMenuDuration(menu);
+
+
+        const requiredSlots =
+            durationMinutes / 30;
+
+
+        const reservedTimes =
+            data.reservedTimes || [];
+
+
+        // ----------------------------------
+        // 各開始時刻を判定
+        // ----------------------------------
+
+        options.forEach(
+            (option, index) => {
+
+                const startMinutes =
+                    timeToMinutes(
+                        option.value
+                    );
+
+
+                const endMinutes =
+                    startMinutes
+                    + durationMinutes;
+
+
+                let canBook = true;
+
+
+                // 営業開始前
+                if (
+                    startMinutes
+                    <
+                    openingMinutes
+                ) {
+                    canBook = false;
+                }
+
+
+                // 閉店時間を超える
+                if (
+                    endMinutes
+                    >
+                    closingMinutes
+                ) {
+                    canBook = false;
+                }
+
+
+                // 必要な連続枠を確認
+                if (canBook) {
+
+                    for (
+                        let i = 0;
+                        i < requiredSlots;
+                        i++
+                    ) {
+
+                        const slotIndex =
+                            index + i;
+
+
+                        if (
+                            slotIndex
+                            >=
+                            options.length
+                        ) {
+
+                            canBook = false;
+
+                            break;
+                        }
+
+
+                        const slotTime =
+                            options[
+                                slotIndex
+                            ].value;
+
+
+                        if (
+                            reservedTimes.includes(
+                                slotTime
+                            )
+                        ) {
+
+                            canBook = false;
+
+                            break;
+                        }
+
+                    }
+
+                }
+
+
+                if (!canBook) {
+
+                    option.disabled =
+                        true;
+
+                    option.textContent =
+                        option.value
+                        + '（予約不可）';
+
+                }
+
+            }
+        );
+
+
+        // ----------------------------------
+        // 最初の予約可能時刻へ
+        // ----------------------------------
+
+        const firstAvailable =
+            options.find(
+                option =>
+                    !option.disabled
+            );
+
+
+        if (firstAvailable) {
+
+            timeSelect.value =
+                firstAvailable.value;
+
+            submitBtn.disabled =
+                false;
+
+        } else {
+
+            timeSelect.selectedIndex =
+                -1;
+
+            submitBtn.disabled =
+                true;
+
+            notice.textContent =
+                'この日は予約可能な時間がありません。';
+
+            notice.style.display =
+                'block';
+
+        }
+
+    })
+
+    .catch(error => {
+
+        console.error(
+            '予約状況取得エラー',
+            error
+        );
+
+
+        notice.textContent =
+            '予約状況を取得できませんでした。';
+
+
+        notice.style.display =
+            'block';
+
+    });
+
+}
+
+
+// ------------------------------------------
+// 予約送信
+// ------------------------------------------
+
+function submitReservation() {
+
+    const menu =
+        menuSelect.value;
+
+    const date =
+        dateInput.value;
+
+    const time =
+        timeSelect.value;
+
+    const name =
+        nameInput.value.trim();
+
+
+    if (
+        !date
+        ||
+        !time
+        ||
+        !name
+    ) {
+
+        alert(
+            '日付・時間・お名前を入力してください。'
+        );
+
+        return;
     }
+
+
+    submitBtn.style.display =
+        'none';
+
+    loadingMsg.style.display =
+        'block';
+
+
+    const payload = {
+
+        sourceType:
+            'WEB_PAGE',
+
+        menu:
+            menu,
+
+        date:
+            date,
+
+        time:
+            time,
+
+        name:
+            name
+
+    };
+
+
+    fetch(
+        GAS_WEB_APP_URL,
+        {
+
+            method: 'POST',
+
+            body:
+                JSON.stringify(
+                    payload
+                )
+
+        }
+    )
+
+    .then(response =>
+        response.json()
+    )
+
+    .then(data => {
+
+        if (
+            data.status
+            ===
+            'success'
+        ) {
+
+            alert(
+                name
+                + '様、ご予約ありがとうございました！\n'
+                + '予約が確定しました。'
+            );
+
+
+            nameInput.value =
+                '';
+
+
+            loadReservedTimes();
+
+        }
+
+
+        else if (
+            data.status
+            ===
+            'conflict'
+        ) {
+
+            alert(
+                '申し訳ありません。\n'
+                + 'その時間は直前に予約が入りました。\n'
+                + '別の時間をお選びください。'
+            );
+
+
+            loadReservedTimes();
+
+        }
+
+
+        else if (
+            data.status
+            ===
+            'closed'
+        ) {
+
+            alert(
+                '申し訳ありません。\n'
+                + 'この日は定休日です。\n'
+                + '別の日をお選びください。'
+            );
+
+
+            loadReservedTimes();
+
+        }
+
+
+        else {
+
+            console.error(
+                'GAS error:',
+                data
+            );
+
+
+            alert(
+                '予約処理中にエラーが発生しました。\n'
+                + '時間を置いてもう一度お試しください。'
+            );
+
+        }
+
+    })
+
+    .catch(error => {
+
+        console.error(
+            '送信エラー:',
+            error
+        );
+
+
+        alert(
+            '送信に失敗しました。\n'
+            + 'もう一度お試しください。'
+        );
+
+    })
+
+    .finally(() => {
+
+        submitBtn.style.display =
+            'block';
+
+        loadingMsg.style.display =
+            'none';
+
+    });
+
+}
+
 </script>
+
 </body>
 </html>
