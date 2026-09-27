@@ -1,0 +1,26 @@
+# Local credentials
+.env
+.env.*
+!.env.example
+.clasprc.json
+.clasprc.*.json
+credentials*.json
+service-account*.json
+*.pem
+*.key
+
+# Dependencies, temporary files and generated test output
+node_modules/
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+*-results.txt
+*.log
+*.zip
+*.tmp
+*.swp
+*~
+.DS_Store
+/work/
+/outputs/

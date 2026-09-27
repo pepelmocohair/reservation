@@ -115,7 +115,7 @@
         <label for="menu">メニューを選択</label>
 
         <select id="menu" disabled>
-            <option value="">メニューを取得中...</option>
+            <option value="">メニューを読み込み中...</option>
         </select>
     </div>
 
@@ -145,7 +145,6 @@
         <input
             type="text"
             id="name"
-            maxlength="200"
             placeholder="山田 太郎"
         >
     </div>
@@ -181,256 +180,198 @@ const GAS_WEB_APP_URL =
     'https://script.google.com/macros/s/AKfycbyRZPtspRr7fT793KBVko2xt9sNoFalCFOsU0yX_tADdr75NyUDTk4rBqDXlwcLjEFIyQ/exec';
 
 
-// ==================================================
-// DOM
-// ==================================================
-
-const dateInput =
-    document.getElementById('date');
-
-const menuSelect =
-    document.getElementById('menu');
-
-const timeSelect =
-    document.getElementById('time');
-
-const nameInput =
-    document.getElementById('name');
-
-const submitBtn =
-    document.getElementById('submitBtn');
-
-const loadingMsg =
-    document.getElementById('loadingMsg');
-
-const notice =
-    document.getElementById('notice');
-
-
-// 開始時刻・営業時間・施術時間・重複の判定はGASに任せる。
-// option.valueにメニューIDを保持し、名称は表示にだけ使用する。
-let menusReady = false;
-let submitting = false;
-let availabilityVersion = 0;
+// 名称・価格・所要時間はすべてGASのメニュー設定から取得する。
+const dateInput = document.getElementById('date');
+const menuSelect = document.getElementById('menu');
+const timeSelect = document.getElementById('time');
+const nameInput = document.getElementById('name');
+const submitBtn = document.getElementById('submitBtn');
+const loadingMsg = document.getElementById('loadingMsg');
+const notice = document.getElementById('notice');
+let menus = [];
+let availableTimes = [];
+let checkedKey = null;
+let requestId = 0;
 let availabilityController = null;
-let currentAvailability = null;
+let submitting = false;
 
-const API_MESSAGES = {
-    busy: '混み合っています。空き状況を更新して再度お試しください。',
-    conflict: 'その時間帯は直前に予約が入りました。別の時間をお選びください。',
-    invalid_request: '入力内容を確認し、日付・メニュー・時間を選び直してください。',
-    outside_hours: 'その時間は営業時間外です。別の時間をお選びください。',
-    closed: 'この日は休業日です。別の日をお選びください。',
-    reservation_data_error: '予約台帳を確認する必要があります。お店へお問い合わせください。',
-    configuration_error: '予約設定を確認する必要があります。お店へお問い合わせください。',
-    menu_not_bookable: 'このメニューはWEB予約できません。メニューを選び直してください。'
-};
+// サロンの日本時間で日付の下限を設定（端末のタイムゾーンには依存しない）。
+const todayParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit'
+}).formatToParts(new Date());
+dateInput.min = ['year', 'month', 'day'].map(type =>
+    todayParts.find(part => part.type === type).value).join('-');
 
-function apiMessage(data) {
-    return typeof data.message === 'string' && data.message.trim()
-        ? data.message
-        : API_MESSAGES[data.status] || '予約処理中にエラーが発生しました。時間を置いて再度お試しください。';
-}
-
-function showNotice(message, retry) {
+function showNotice(message) {
     notice.textContent = message;
     notice.style.display = message ? 'block' : 'none';
-    if (retry) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'btn';
-        button.textContent = '再読み込み';
-        button.addEventListener('click', retry);
-        notice.appendChild(button);
-    }
 }
 
-function resetTimes(label) {
-    currentAvailability = null;
-    timeSelect.replaceChildren(new Option(label, ''));
+function resetTimes(message) {
+    availableTimes = [];
+    checkedKey = null;
+    timeSelect.replaceChildren(new Option(message, ''));
     timeSelect.disabled = true;
     submitBtn.disabled = true;
 }
 
-function hasCurrentTime() {
-    return menusReady && currentAvailability !== null
-        && currentAvailability.date === dateInput.value
-        && currentAvailability.menuId === menuSelect.value
-        && currentAvailability.times.includes(timeSelect.value);
+function selectionKey() {
+    return dateInput.value + '|' + menuSelect.value;
 }
 
-function updateSubmitButton() {
-    submitBtn.disabled = submitting || !hasCurrentTime();
+function updateSubmit() {
+    submitBtn.disabled = submitting || checkedKey !== selectionKey() ||
+        timeSelect.disabled || !availableTimes.includes(timeSelect.value) ||
+        !nameInput.value.trim();
 }
 
-async function fetchJson(url, options = {}) {
+async function requestJSON(url, options = {}) {
     const response = await fetch(url, options);
-    if (!response.ok) throw new Error('HTTP error');
+    if (!response.ok) throw new Error('通信できませんでした。時間を置いて再度お試しください。');
     const data = await response.json();
-    if (!data || typeof data.status !== 'string') throw new Error('Invalid response');
+    if (!data || data.status !== 'success') {
+        const error = new Error(data && data.message || '予約情報を取得できませんでした。');
+        error.status = data && data.status;
+        throw error;
+    }
     return data;
 }
 
-async function loadMenus(message = '') {
-    menusReady = false;
-    ++availabilityVersion;
+async function loadMenus() {
+    requestId++;
     if (availabilityController) availabilityController.abort();
-    menuSelect.disabled = true;
-    menuSelect.replaceChildren(new Option('メニューを取得中...', ''));
     resetTimes('日付とメニューを選択してください');
-    showNotice(message);
+    menuSelect.disabled = true;
+    menuSelect.replaceChildren(new Option('メニューを読み込み中...', ''));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
     try {
-        const data = await fetchJson(GAS_WEB_APP_URL + '?action=menus');
-        if (data.status !== 'success') {
-            menuSelect.replaceChildren(new Option('メニューを取得できませんでした', ''));
-            showNotice(apiMessage(data), () => loadMenus());
-            return;
+        const data = await requestJSON(GAS_WEB_APP_URL + '?action=menus', { signal: controller.signal });
+        if (!Array.isArray(data.menus) || data.slotMinutes !== 10 ||
+            !data.menus.every(menu => menu && typeof menu.id === 'string' && menu.id &&
+                typeof menu.category === 'string' && typeof menu.name === 'string' &&
+                typeof menu.price === 'string' && typeof menu.bookable === 'boolean')) {
+            throw new Error('メニュー情報の形式が不正です。');
         }
-        if (!Array.isArray(data.menus) || !data.menus.every(menu =>
-            menu && typeof menu.id === 'string' && menu.id.trim()
-            && typeof menu.name === 'string' && typeof menu.bookable === 'boolean'
-        )) throw new Error('Invalid menus');
-
-        menuSelect.replaceChildren();
-        data.menus.forEach(menu => {
-            const duration = Number.isInteger(menu.durationMinutes)
-                ? '（' + menu.durationMinutes + '分）' : '';
-            const option = new Option(
-                menu.name + duration + (menu.bookable ? '' : '（WEB予約不可）'),
-                menu.id
-            );
+        menus = data.menus;
+        menuSelect.replaceChildren(new Option('メニューを選択してください', ''));
+        const groups = new Map();
+        menus.forEach(menu => {
+            if (menu.webBookingEnabled !== true) return;
+            if (!groups.has(menu.category)) {
+                const group = document.createElement('optgroup');
+                group.label = menu.category;
+                groups.set(menu.category, group);
+                menuSelect.appendChild(group);
+            }
+            const suffix = menu.bookable ? '' : menu.unavailableReason === 'duration_not_set' ?
+                '（所要時間設定中）' : '（WEB予約受付準備中）';
+            const option = new Option(menu.name + ' ' + menu.price + suffix, menu.id);
             option.disabled = !menu.bookable;
-            menuSelect.appendChild(option);
+            groups.get(menu.category).appendChild(option);
         });
-        const first = data.menus.find(menu => menu.bookable);
-        if (!first) {
-            menuSelect.replaceChildren(new Option('WEB予約可能なメニューがありません', ''));
-            showNotice('現在WEB予約可能なメニューがありません。', () => loadMenus());
-            return;
-        }
-        menuSelect.value = first.id;
-        menusReady = true;
-        menuSelect.disabled = submitting;
-        await loadAvailability(message);
+        menuSelect.disabled = !menus.some(menu => menu.webBookingEnabled && menu.bookable);
+        showNotice(menuSelect.disabled ? '現在WEB予約できるメニューがありません。' : '');
     } catch (error) {
         menuSelect.replaceChildren(new Option('メニューを取得できませんでした', ''));
-        showNotice('メニューを取得できませんでした。時間を置いて再読み込みしてください。', () => loadMenus());
-    }
+        showNotice('メニューを取得できませんでした。ページを再読み込みしてください。');
+    } finally { clearTimeout(timer); }
 }
 
-async function loadAvailability(message = '') {
-    const version = ++availabilityVersion;
+async function loadAvailability() {
+    const currentRequest = ++requestId;
     if (availabilityController) availabilityController.abort();
+    resetTimes('日付とメニューを選択してください');
+    showNotice('');
     const date = dateInput.value;
     const menuId = menuSelect.value;
-    resetTimes('日付とメニューを選択してください');
-    showNotice(message);
-    if (!menusReady || !date || !menuId) return;
-
+    const menu = menus.find(item => item.id === menuId && item.bookable && item.webBookingEnabled);
+    if (!date || !menu) return;
+    if (date < dateInput.min) { showNotice('今日以降の日付を選択してください。'); return; }
+    const key = selectionKey();
+    resetTimes('空き状況を確認中...');
     const controller = new AbortController();
     availabilityController = controller;
-    const isCurrent = () => version === availabilityVersion
-        && date === dateInput.value && menuId === menuSelect.value;
-    resetTimes('空き状況を取得中...');
+    const timer = setTimeout(() => controller.abort(), 15000);
     try {
-        const query = new URLSearchParams({ action: 'availability', date, menuId });
-        const data = await fetchJson(GAS_WEB_APP_URL + '?' + query, { signal: controller.signal });
-        if (!isCurrent()) return;
-        if (data.status !== 'success') {
-            resetTimes('空き状況を取得できませんでした');
-            showNotice([message, apiMessage(data)].filter(Boolean).join('\n'),
-                () => data.status === 'menu_not_bookable' ? loadMenus() : loadAvailability());
+        const data = await requestJSON(GAS_WEB_APP_URL + '?action=availability&date=' +
+            encodeURIComponent(date) + '&menuId=' + encodeURIComponent(menuId), { signal: controller.signal });
+        if (currentRequest !== requestId || key !== selectionKey()) return;
+        if (data.date !== date || data.menuId !== menuId || data.slotMinutes !== 10 ||
+            typeof data.isClosed !== 'boolean' || !Array.isArray(data.availableStartTimes) ||
+            !data.availableStartTimes.every(time => /^(?:[01]\d|2[0-3]):[0-5]0$/.test(time))) {
+            throw new Error('空き状況の形式が不正です。');
+        }
+        if (data.isClosed) { resetTimes('休業日です'); showNotice('この日は休業日です。'); return; }
+        if (!data.availableStartTimes.length) {
+            resetTimes('予約可能な時間がありません');
+            showNotice('この日は予約可能な時間がありません。');
             return;
         }
-        // 応答の形式と対象を確認するだけで、予約可否を再計算しない。
-        if (data.date !== date || data.menuId !== menuId
-            || typeof data.isClosed !== 'boolean'
-            || !Array.isArray(data.availableStartTimes)
-            || !data.availableStartTimes.every(time =>
-                typeof time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)
-            )) throw new Error('Invalid availability');
-        if (data.isClosed || data.availableStartTimes.length === 0) {
-            const explanation = data.isClosed ? 'この日は休業日です。' : 'この日は予約可能な時間がありません。';
-            resetTimes(data.isClosed ? '休業日' : '空き時間がありません');
-            showNotice([message, explanation].filter(Boolean).join('\n'));
-            return;
-        }
-        timeSelect.replaceChildren(...data.availableStartTimes.map(time => new Option(time, time)));
-        timeSelect.value = data.availableStartTimes[0];
-        currentAvailability = { date, menuId, times: data.availableStartTimes };
-        timeSelect.disabled = submitting;
-        updateSubmitButton();
+        // 時刻をローカル生成・補完しない。GASが許可した時刻だけを表示。
+        availableTimes = [...new Set(data.availableStartTimes)];
+        timeSelect.replaceChildren(new Option('開始時刻を選択してください', ''),
+            ...availableTimes.map(time => new Option(time, time)));
+        timeSelect.disabled = false;
+        checkedKey = key;
+        updateSubmit();
     } catch (error) {
-        if (!isCurrent()) return;
+        if (currentRequest !== requestId || key !== selectionKey()) return;
         resetTimes('空き状況を取得できませんでした');
-        showNotice([message, '空き状況を取得できませんでした。再読み込みしてください。'].filter(Boolean).join('\n'),
-            () => loadAvailability());
-    } finally {
-        if (isCurrent()) availabilityController = null;
-    }
+        showNotice(error.name === 'AbortError' ? '取得に時間がかかっています。日付を選び直してください。' : error.message);
+    } finally { clearTimeout(timer); }
 }
 
 async function submitReservation() {
-    if (submitting || !hasCurrentTime()) return;
-    const name = nameInput.value.trim();
-    if (!name || name.length > 200) {
-        alert('お名前を200文字以内で入力してください。');
-        return;
-    }
-    const payload = {
-        sourceType: 'WEB_PAGE',
-        menuId: menuSelect.value,
-        date: dateInput.value,
-        time: timeSelect.value,
-        name
-    };
+    updateSubmit();
+    if (submitBtn.disabled) return;
+    const payload = { sourceType: 'WEB_PAGE', menuId: menuSelect.value,
+        date: dateInput.value, time: timeSelect.value, name: nameInput.value.trim() };
     submitting = true;
-    ++availabilityVersion;
+    requestId++;
     if (availabilityController) availabilityController.abort();
-    showNotice('');
-    submitBtn.disabled = true;
-    submitBtn.style.display = 'none';
+    resetTimes('予約を送信中...');
+    [menuSelect, dateInput, nameInput].forEach(element => element.disabled = true);
     loadingMsg.style.display = 'block';
-    dateInput.disabled = true;
-    menuSelect.disabled = true;
-    timeSelect.disabled = true;
-    nameInput.disabled = true;
-    let message = '';
+    showNotice('');
     let refreshMenus = false;
+    let message = '';
+    // POSTは自動再試行しない。応答喪失時は登録済みの可能性がある。
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
     try {
-        // 既存のGASへの送信形式を維持。所要時間・料金は送らない。
-        const data = await fetchJson(GAS_WEB_APP_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
+        const data = await requestJSON(GAS_WEB_APP_URL, {
+            method: 'POST', body: JSON.stringify(payload), signal: controller.signal
         });
-        if (data.status === 'success') {
-            alert(name + '様、ご予約ありがとうございました！\n予約が確定しました。');
-            nameInput.value = '';
-        } else {
-            message = apiMessage(data);
-            refreshMenus = data.status === 'menu_not_bookable';
-        }
+        nameInput.value = '';
+        message = '予約が確定しました。予約ID：' + data.reservationId;
     } catch (error) {
-        // 通信失敗でもGASでは保存済みの可能性があるため自動再送しない。
-        message = '予約結果を確認できませんでした。再送信する前に、お店へ予約状況をご確認ください。';
+        refreshMenus = error.status === 'menu_not_bookable' || error.status === 'configuration_error';
+        message = error.status ? error.message :
+            '予約結果を確認できませんでした。登録済みの可能性があるため、再送前に店舗へご確認ください。';
     } finally {
-        // 再取得が終わるまでは送信不可。エラーメッセージは再取得後も残す。
-        resetTimes('空き状況を更新中...');
+        clearTimeout(timer);
         submitting = false;
-        dateInput.disabled = false;
-        menuSelect.disabled = !menusReady;
-        nameInput.disabled = false;
-        submitBtn.style.display = 'block';
+        [menuSelect, dateInput, nameInput].forEach(element => element.disabled = false);
         loadingMsg.style.display = 'none';
+        if (refreshMenus) await loadMenus();
+        else await loadAvailability();
+        showNotice(message);
     }
-    if (refreshMenus) await loadMenus(message);
-    else await loadAvailability(message);
 }
 
-dateInput.addEventListener('change', () => loadAvailability());
-menuSelect.addEventListener('change', () => loadAvailability());
-timeSelect.addEventListener('change', updateSubmitButton);
+// input時点で古い時刻を無効化。changeで確定した条件を取得する。
+dateInput.addEventListener('input', () => {
+    requestId++;
+    if (availabilityController) availabilityController.abort();
+    resetTimes('日付とメニューを選択してください');
+});
+dateInput.addEventListener('change', loadAvailability);
+menuSelect.addEventListener('change', loadAvailability);
+timeSelect.addEventListener('change', updateSubmit);
+nameInput.addEventListener('input', updateSubmit);
 submitBtn.addEventListener('click', submitReservation);
+resetTimes('日付とメニューを選択してください');
 loadMenus();
 
 </script>
