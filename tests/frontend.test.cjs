@@ -12,9 +12,11 @@ class Element {
  setAttribute(name,value){(this.attributes ||= {})[name]=value;}
 }
 const menu={id:'m1',category:'分類',name:'マスター名',price:'¥1,234〜',durationMinutes:70,webBookingEnabled:true,bookable:true};
-function setup(){
+function setup(hash=''){
  const els=Object.fromEntries(['date','menu','time','name','submitBtn','loadingMsg','notice','calendar','calendarDays','monthLabel','selectedDate','menuDetails','timeButtons','timeStatus','prevMonth','nextMonth'].map(id=>[id,new Element()]));
- const requests=[];const ctx={console,Intl,Date,Set,Map,AbortController,Option:Element,encodeURIComponent,setTimeout:()=>1,clearTimeout:()=>{},
+ els.phone=new Element('', '09012345678');
+ const location={hash,pathname:'/reservation/',search:''};const window={events:{},addEventListener:(e,f)=>window.events[e]=f};const history={replaceState:(a,b,url)=>{location.hash=url.slice(url.indexOf('#'));}};
+ const requests=[];const ctx={location,history,window,URLSearchParams,console,Intl,Date,Set,Map,AbortController,Option:Element,encodeURIComponent,setTimeout:()=>1,clearTimeout:()=>{},
  document:{getElementById:id=>(els[id] ||= new Element()),createElement:()=>new Element()},fetch:(url,options={})=>new Promise((resolve,reject)=>requests.push({url,options,resolve:data=>resolve({ok:true,json:async()=>data}),reject}))};
  vm.createContext(ctx);vm.runInContext(script,ctx);
  return {els,requests,run:s=>vm.runInContext(s,ctx)};
@@ -29,7 +31,7 @@ test('date input immediately invalidates old availability',async()=>{const s=set
 test('stale response cannot replace newer availability',async()=>{const s=setup();await ready(s);const first=availability(s);const old=s.requests.shift();const second=availability(s,'2099-01-07');s.requests.shift().resolve(response('2099-01-07',['12:10']));await second;old.resolve(response());await first;assert.deepEqual(s.els.time.children.map(x=>x.value),['','12:10'])});
 for(const [label,data] of [['closed',{...response(),isClosed:true}],['full',response(undefined,[])],['missing times',{...response(),availableStartTimes:undefined}],['off grid',response(undefined,['10:45'])],['old API',{status:'success',reservedTimes:[]}],['error',{status:'configuration_error',message:'未準備'}]])test('fail closed '+label,async()=>{const s=setup();await ready(s);const p=availability(s);s.requests.shift().resolve(data);await p;assert.equal(s.els.time.disabled,true);assert.equal(s.els.submitBtn.disabled,true)});
 test('GET network failure disables booking',async()=>{const s=setup();await ready(s);const p=availability(s);s.requests.shift().reject(new Error('offline'));await p;assert.equal(s.els.submitBtn.disabled,true)});
-test('POST sends ID only, disables controls, no duplicate submission, refreshes',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='テスト';s.run('openReview()');p=s.run('submitReservation()');assert.equal(s.els.menu.disabled,true);assert.equal(s.els.date.disabled,true);assert.equal(s.els.submitBtn.disabled,true);const post=s.requests.shift();assert.equal(post.options.method,'POST');assert.deepEqual(JSON.parse(post.options.body),{sourceType:'WEB_PAGE',menuId:'m1',date:'2099-01-06',time:'10:40',name:'テスト'});await s.run('submitReservation()');assert.equal(s.requests.length,0);post.resolve({status:'success',reservationId:'R1'});await new Promise(setImmediate);s.requests.shift().resolve(response());await p;assert.equal(s.els.time.value,'');assert.equal(s.els.submitBtn.disabled,true);assert.match(s.els.notice.textContent,/R1/)});
+test('POST sends ID only, disables controls, no duplicate submission, completes',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='テスト';s.run('openReview()');p=s.run('submitReservation()');assert.equal(s.els.menu.disabled,true);assert.equal(s.els.date.disabled,true);assert.equal(s.els.submitBtn.disabled,true);const post=s.requests.shift();assert.equal(post.options.method,'POST');assert.deepEqual(JSON.parse(post.options.body),{sourceType:'WEB_PAGE',requestVersion:2,menuId:'m1',date:'2099-01-06',time:'10:40',name:'テスト',phone:'09012345678'});await s.run('submitReservation()');assert.equal(s.requests.length,0);post.resolve({status:'success',reservationId:'R1'});await p;assert.equal(s.requests.length,0);assert.equal(s.els.time.value,'');assert.equal(s.els.submitBtn.disabled,true);assert.equal(s.els.completedDetails.children[0].children[1].textContent,'R1')});
 test('uncertain POST never automatically retries',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='テスト';s.run('openReview()');p=s.run('submitReservation()');s.requests.shift().reject(new Error('lost response'));await new Promise(setImmediate);assert.match(s.requests[0].url,/action=availability/);s.requests.shift().resolve(response());await p;assert.match(s.els.notice.textContent,/登録済みの可能性/);assert.equal(s.els.submitBtn.disabled,true)});
 
 test('calendar gates dates until menu selection, marks today and blocks past dates',async()=>{
@@ -64,7 +66,7 @@ test('menu change clears time buttons and old response cannot restore them',asyn
 });
 
 test('cards use master fields, hide OFF and disable unbookable',async()=>{const s=setup();await ready(s,[menu,{...menu,id:'off',webBookingEnabled:false},{...menu,id:'unset',bookable:false,durationMinutes:null}]);const cards=s.els.menuCards.children[0].children.slice(1);assert.equal(cards.length,2);assert.equal(cards[1].disabled,true);cards[0].events.click();assert.equal(s.els.menu.value,'m1');assert.equal(s.els.toDate.disabled,false);assert.equal(s.els.customerPanel.hidden,true);s.els.toDate.events.click();assert.equal(s.els.datePanel.hidden,false);});
-test('review displays exact data and POST cannot bypass review or use changed name',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='確認名';await s.run('submitReservation()');assert.equal(s.requests.length,0);s.run('openReview()');assert.equal(s.els.reviewPanel.hidden,false);assert.deepEqual(s.els.reviewDetails.children.map(row=>row.children[1].textContent),['マスター名','¥1,234〜','70分','2099-01-06　10:40','確認名']);s.els.name.value='変更名';await s.run('submitReservation()');assert.equal(s.requests.length,0);});
+test('review displays exact data and POST cannot bypass review or use changed name',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='確認名';await s.run('submitReservation()');assert.equal(s.requests.length,0);s.run('openReview()');assert.equal(s.els.reviewPanel.hidden,false);assert.deepEqual(s.els.reviewDetails.children.map(row=>row.children[1].textContent),['マスター名','¥1,234〜','70分','2099-01-06　10:40','確認名','09012345678']);s.els.name.value='変更名';await s.run('submitReservation()');assert.equal(s.requests.length,0);});
 test('changing date invalidates reviewed booking and closes customer path',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='確認名';s.run('openReview()');s.els.editDate.events.click();s.run('invalidateWeek()');s.requests.shift().reject(new Error('cancelled'));p=availability(s,'2099-01-07');assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.els.reviewPanel.hidden,true);s.requests.shift().resolve(response('2099-01-07',[]));await p;await s.run('submitReservation()');assert.equal(s.requests.length,0);});
 
 function weekResponse(req,times=['10:40']) {
@@ -137,11 +139,99 @@ test('combined week and daily use IDs only, review and POST preserve selection a
  p=s.els.schedule.children[1].children[1].children[1].children[0].events.click();req=s.requests.shift();params=new URL(req.url).searchParams;
  assert.deepEqual(JSON.parse(params.get('menuIds')),ids);const date=params.get('date'),daily={...response(date,['10:40']),menuIds:ids};delete daily.menuId;
  req.resolve(daily);await p;s.els.name.value='複数テスト';s.run('openReview()');assert.equal(s.els.reviewDetails.children[2].children[1].textContent,'160分');
- p=s.run('submitReservation()');const post=s.requests.shift();assert.deepEqual(JSON.parse(post.options.body),{sourceType:'WEB_PAGE',menuIds:ids,date,time:'10:40',name:'複数テスト'});
- await s.run('submitReservation()');assert.equal(s.requests.length,0);post.resolve({status:'success',reservationId:'MULTI'});await new Promise(setImmediate);s.requests.shift().resolve(daily);await p;
+ p=s.run('submitReservation()');const post=s.requests.shift();assert.deepEqual(JSON.parse(post.options.body),{sourceType:'WEB_PAGE',requestVersion:2,menuIds:ids,date,time:'10:40',name:'複数テスト',phone:'09012345678'});
+ await s.run('submitReservation()');assert.equal(s.requests.length,0);post.resolve({status:'success',reservationId:'MULTI'});await p;assert.equal(s.els.completedPanel.hidden,false);
 });
 test('changing combination aborts old weekly response and clears reviewed date and time',async()=>{
  const s=setup();await ready(s,[menu,{...menu,id:'m2'}]);s.run("selectMenu('m1',true);selectMenu('m2',true)");const p=s.run('loadWeek()'),old=s.requests.shift();
  s.els.time.value='10:40';s.els.date.value='2099-01-06';s.run("selectMenu('m2',true)");assert.equal(old.options.signal.aborted,true);assert.equal(s.els.date.value,'');assert.equal(s.els.time.value,'');
  old.resolve(weekResponse(old));await p;assert.equal(s.run('weekDays.length'),0);assert.equal(s.els.submitBtn.disabled,true);
+});
+
+async function reviewReady(s,phone='09012345678') {
+ await ready(s);const p=availability(s);s.requests.shift().resolve(response());await p;
+ s.els.time.value='10:40';s.els.name.value='電話テスト';s.els.phone.value=phone;s.run('openReview()');
+}
+for(const phone of ['090-1234-5678','09012345678','03-1234-5678','０９０－１２３４－５６７８']) test('phone accepted and POST normalized: '+phone,async()=>{
+ const s=setup();await reviewReady(s,phone);const p=s.run('submitReservation()');const req=s.requests.shift();
+ assert.equal(JSON.parse(req.options.body).phone,phone.startsWith('03')?'0312345678':'09012345678');
+ req.resolve({status:'success',reservationId:'PHONE'});await p;assert.equal(s.els.completedPanel.hidden,false);
+});
+for(const phone of ['', ' ', 'abc', '123', '090000000000', '00000000000']) test('invalid phone blocks review and POST: '+JSON.stringify(phone),async()=>{
+ const s=setup();await reviewReady(s,phone);assert.equal(s.els.reviewBtn.disabled,true);await s.run('submitReservation()');assert.equal(s.requests.length,0);assert.equal(s.els.completedPanel.hidden,true);
+});
+test('success displays submitted details, hides entire form and cannot start another reservation',async()=>{
+ const s=setup();await reviewReady(s);const p=s.run('submitReservation()');s.requests.shift().resolve({status:'success',reservationId:'DONE'});await p;
+ assert.equal(s.els.bookingForm.hidden,true);assert.equal(s.els.completedPanel.hidden,false);
+ for(const step of ['menu','date','customer','review']) assert.equal(s.els[step+'Panel'].hidden,true);
+ assert.deepEqual(s.els.completedDetails.children.map(row=>row.children[1].textContent),['DONE','マスター名','2099-01-06　10:40']);
+ assert.equal(s.els.phone.disabled,true);assert.equal(s.els.submitBtn.disabled,true);
+ await s.run("showStep('menu');selectMenu('m1');loadAvailability();loadWeek();loadMenus();submitReservation()");assert.equal(s.requests.length,0);assert.equal(s.els.bookingForm.hidden,true);
+ assert.match(html,/ご予約を承りました。/);assert.match(html,/予約手続きは完了しました。この画面は閉じていただいて大丈夫です。/);
+ assert.match(html, /type="tel" id="phone" inputmode="tel" autocomplete="tel"/);
+});
+test('phone change after review cannot bypass reconfirmation',async()=>{
+ const s=setup();await reviewReady(s);s.els.phone.value='08012345678';await s.run('submitReservation()');assert.equal(s.requests.length,0);
+});
+test('conflict POST keeps form and error, never displays completion',async()=>{
+ const s=setup();await reviewReady(s);const p=s.run('submitReservation()');s.requests.shift().resolve({status:'conflict',message:'すでに予約されています'});
+ await new Promise(setImmediate);s.requests.shift().resolve(response(undefined,[]));await p;
+ assert.equal(s.els.completedPanel.hidden,true);assert.equal(s.els.bookingForm.hidden,false);assert.match(s.els.notice.textContent,/すでに予約/);assert.equal(s.els.phone.disabled,false);
+});
+
+const token='a'.repeat(64),cancelHash='#cancel=WEB-TEST&token='+token;
+async function cancellationReady(s,cancelled=false) {
+ assert.equal(s.requests.length,1);const request=s.requests.shift();assert.equal(request.options.method,'POST');assert.equal(JSON.parse(request.options.body).action,'cancelPreview');
+ assert.equal(request.url.includes(token),false);request.resolve({status:'success',date:'2099-01-06',time:'10:40',menu:'カット ＋ カラー',cancelled});await new Promise(setImmediate);
+}
+test('v2 POST shows fragment cancel link without phone after booking success',async()=>{
+ const s=setup();await reviewReady(s);const p=s.run('submitReservation()'),req=s.requests.shift();assert.equal(JSON.parse(req.options.body).requestVersion,2);
+ req.resolve({status:'success',reservationId:'WEB-TEST',cancelToken:token,canCancel:true});await p;
+ assert.equal(s.els.cancelLink.hidden,false);assert.equal(s.els.cancelLink.href,cancelHash);assert.equal(s.els.cancelLink.href.includes('09012345678'),false);assert.equal(s.els.cancelLinkHint.hidden,false);
+});
+test('opening cancel link only previews, hides booking form, scrubs address and exposes no name/phone',async()=>{
+ const s=setup(cancelHash);assert.equal(s.run('location.hash'),'#cancel');assert.equal(s.els.bookingForm.hidden,true);await cancellationReady(s);
+ assert.deepEqual(s.els.cancelDetails.children.map(r=>r.children[1].textContent),['2099-01-06　10:40','カット ＋ カラー']);assert.equal(s.requests.length,0);assert.equal(s.els.cancelSubmit.disabled,true);assert.equal(s.els.completedPanel.hidden,true);
+});
+test('explicit cancellation sends token ID phone, blocks double click and shows completed only on success',async()=>{
+ const s=setup(cancelHash);await cancellationReady(s);s.els.cancelPhone.value='090-1234-5678';s.els.cancelPhone.events.input();
+ const p=s.run('submitCancellation()'),req=s.requests.shift();assert.deepEqual(JSON.parse(req.options.body),{sourceType:'WEB_PAGE',action:'cancelReservation',reservationId:'WEB-TEST',cancelToken:token,phone:'09012345678'});
+ assert.equal(s.els.cancelSubmit.disabled,true);await s.run('submitCancellation()');assert.equal(s.requests.length,0);
+ req.resolve({status:'success',alreadyCancelled:false});await p;assert.match(s.els.cancelNotice.textContent,/予約をキャンセルしました/);assert.equal(s.els.cancelControls.hidden,true);assert.equal(s.els.cancelPhone.value,'');
+ await s.run('submitCancellation()');assert.equal(s.requests.length,0);
+});
+for(const failure of ['wrong credentials','network']) test('failed cancellation never completes or auto-retries: '+failure,async()=>{
+ const s=setup(cancelHash);await cancellationReady(s);s.els.cancelPhone.value='09012345678';const p=s.run('submitCancellation()'),req=s.requests.shift();
+ if(failure==='network')req.reject(new Error('lost'));else req.resolve({status:'cancel_unavailable',message:'denied'});await p;
+ assert.doesNotMatch(s.els.cancelNotice.textContent,/予約をキャンセルしました/);assert.equal(s.els.cancelControls.hidden,false);assert.equal(s.requests.length,0);assert.equal(s.els.completedPanel.hidden,true);
+});
+test('cancelled preview disables cancellation and never POSTs mutation',async()=>{
+ const s=setup(cancelHash);await cancellationReady(s,true);assert.match(s.els.cancelNotice.textContent,/キャンセル済み/);s.els.cancelPhone.value='09012345678';await s.run('submitCancellation()');assert.equal(s.requests.length,0);assert.equal(s.els.cancelControls.hidden,true);
+});
+test('invalid link or failed preview cannot submit cancellation',async()=>{
+ const broken=setup('#cancel=WEB-TEST');await new Promise(setImmediate);assert.equal(broken.requests.length,0);assert.match(broken.els.cancelNotice.textContent,/予約を確認できません/);
+ const s=setup(cancelHash);s.requests.shift().resolve({status:'cancel_unavailable',message:'denied'});await new Promise(setImmediate);s.els.cancelPhone.value='09012345678';await s.run('submitCancellation()');assert.equal(s.requests.length,0);
+});
+test('empty or invalid cancellation phone cannot submit',async()=>{
+ const s=setup(cancelHash);await cancellationReady(s);
+ for(const value of ['','abc','123']){s.els.cancelPhone.value=value;await s.run('submitCancellation()');assert.equal(s.requests.length,0);assert.equal(s.els.cancelSubmit.disabled,true);}
+});
+test('completion remains hidden if async booking render runs on cancellation screen',async()=>{
+ const s=setup(cancelHash);await cancellationReady(s);s.run('renderFlow()');assert.equal(s.els.completedPanel.hidden,true);assert.equal(s.els.bookingForm.hidden,true);
+});
+test('saved completion link opens preview in same page via hashchange without another booking',async()=>{
+ const s=setup();await reviewReady(s);const p=s.run('submitReservation()');s.requests.shift().resolve({status:'success',reservationId:'WEB-TEST',cancelToken:token,canCancel:true});await p;
+ s.run("location.hash='"+cancelHash+"';window.events.hashchange()");await cancellationReady(s);assert.equal(s.els.completedPanel.hidden,true);assert.equal(s.els.bookingForm.hidden,true);
+});
+
+test('late preview cannot overwrite a newer cancellation target',async()=>{
+ const s=setup(cancelHash),old=s.requests.shift();s.run("location.hash='#cancel=WEB-NEW&token="+'b'.repeat(64)+"';openCancellation()");
+ const next=s.requests.shift();next.resolve({status:'success',date:'2099-01-07',time:'11:00',menu:'新しい対象',cancelled:false});await new Promise(setImmediate);
+ old.resolve({status:'success',date:'2099-01-06',time:'10:40',menu:'古い対象',cancelled:false});await new Promise(setImmediate);
+ assert.deepEqual(s.els.cancelDetails.children.map(r=>r.children[1].textContent),['2099-01-07　11:00','新しい対象']);
+});
+test('late cancel response cannot mark a different target cancelled',async()=>{
+ const s=setup(cancelHash);await cancellationReady(s);s.els.cancelPhone.value='09012345678';const p=s.run('submitCancellation()'),old=s.requests.shift();
+ s.run("location.hash='#cancel=WEB-NEW&token="+'b'.repeat(64)+"';openCancellation()");s.requests.shift().resolve({status:'success',date:'2099-01-07',time:'11:00',menu:'新しい対象',cancelled:false});await new Promise(setImmediate);
+ old.resolve({status:'success'});await p;assert.doesNotMatch(s.els.cancelNotice.textContent,/予約をキャンセルしました/);assert.equal(s.els.cancelControls.hidden,false);assert.equal(s.els.cancelPhone.disabled,false);
 });
