@@ -294,3 +294,38 @@ test('tapping already validated selected circle keeps selection without redundan
  await s.els.schedule.children[1].children[1].children[1].children[0].events.click();
  assert.equal(s.requests.length,0);assert.equal(s.els.time.value,'10:40');assert.equal(s.els.toCustomer.disabled,false);
 });
+
+test('weekly loading is inside calendar, retains seven headers and replaces overlay on success',async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';const p=s.run('loadWeek()');
+ assert.equal(s.els.calendarLoading.hidden,false);assert.equal(s.els.calendarRegion.attributes['aria-busy'],'true');
+ assert.equal(s.els.schedule.children[0].children[0].children.length,8);
+ assert.match(html,/<table id="schedule"[\s\S]*?<div id="calendarLoading"/);
+ const req=s.requests.shift();req.resolve(weekResponse(req));await p;
+ assert.equal(s.els.calendarLoading.hidden,true);assert.equal(s.els.calendarRegion.attributes['aria-busy'],'false');
+ assert.equal(s.els.schedule.children[1].children[1].children[1].children[0].textContent,'◎');
+});
+async function longWeek(s,times=['10:00','10:10','10:20','10:40']) {
+ await ready(s);s.run("selectMenu('m1')");const p=s.run('loadWeek()'),req=s.requests.shift(),data=weekResponse(req,times);
+ Object.values(data.days).forEach(day=>{day.openingTime='10:00';day.closingTime='19:00'});req.resolve(data);await p;
+}
+for(const time of ['10:00','10:10','10:20']) test('half-hour band preserves exact API ten-minute selection '+time,async()=>{
+ const s=setup();await longWeek(s);const rows=s.els.schedule.children[1].children;
+ assert.equal(rows.length,18);assert.deepEqual(rows.slice(0,3).map(r=>r.children[0].textContent),['10:00','10:30','11:00']);
+ rows[0].children[1].children[0].events.click();assert.equal(rows[0].children[1].children[0].attributes['aria-pressed'],'true');assert.equal(s.requests.length,0);assert.equal(s.els.slotPicker.hidden,false);
+ assert.deepEqual(s.els.slotOptions.children.map(b=>b.textContent),['10:00','10:10','10:20']);
+ const p=s.els.slotOptions.children.find(b=>b.textContent===time).events.click();assert.equal(s.els.slotPicker.hidden,true);
+ assert.match(s.els.selectionStatus.textContent,/再確認中/);assert.equal(rows[0].children[1].children[0].textContent,'◎');
+ const req=s.requests.shift();req.resolve(response(new URL(req.url).searchParams.get('date'),['10:00','10:10','10:20']));await p;
+ assert.equal(s.els.time.value,time);assert.equal(s.els.toCustomer.disabled,false);
+ assert.equal(s.els.schedule.children[1].children[0].children[1].children[0].attributes['aria-pressed'],'true');
+});
+test('band offers only available API times, closes on week change and old choices cannot book',async()=>{
+ const s=setup();await longWeek(s,['10:20']);s.els.schedule.children[1].children[0].children[1].children[0].events.click();
+ assert.deepEqual(s.els.slotOptions.children.map(b=>b.textContent),['10:20']);const old=s.els.slotOptions.children[0];
+ s.run('moveWeek(1)');assert.equal(s.els.slotPicker.hidden,true);await old.events.click();assert.equal(s.requests.length,1);assert.equal(s.els.time.value,'');
+});
+test('weekly loading failure exits overlay and keeps retry; stale response cannot clear new loading',async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';const p=s.run('loadWeek()'),old=s.requests.shift();
+ s.run('moveWeek(1)');const next=s.requests.shift();old.resolve(weekResponse(old));await p;assert.equal(s.els.calendarLoading.hidden,false);
+ next.reject(new Error('offline'));await new Promise(setImmediate);assert.equal(s.els.calendarLoading.hidden,true);assert.equal(s.els.retryWeek.hidden,false);
+});

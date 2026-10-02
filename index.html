@@ -121,6 +121,39 @@
             #customerPanel label { margin:14px 0 6px; }
             .review div { padding:10px 0; }
         }
+
+        /* The date step gives the weekly calendar the first screen. */
+        #bookingForm[data-step="date"] .steps { margin-bottom:4px; }
+        #bookingForm[data-step="date"] .steps li { padding:4px 2px; }
+        #bookingForm[data-step="date"] .summary { padding:0; margin:0; border:0; line-height:1.4; }
+        #bookingForm[data-step="date"] .summary button { min-height:44px; border:0; text-decoration:underline; }
+        #dateLabel, #timeStatus { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); margin:0; }
+        #datePanel { padding-top:0; }
+        @media(min-width:768px) { body:has(#bookingForm[data-step="date"]) { padding-top:8px; } }
+        .week-nav { height:44px; }
+        .week-nav button { min-width:44px; min-height:44px; padding:0; font-size:28px; border:0; }
+        #weekStatus:empty { display:none; }
+        .schedule-scroll { position:relative; height: min(650px, calc(100dvh - 260px)); max-height:none; margin:0; }
+        .schedule { min-width:0; }
+        .schedule th:first-child { width:44px; }
+        .schedule thead th { height:36px; line-height:1.3; }
+        .schedule th,.schedule td { height:36px; }
+        .schedule button { height:36px; min-height:36px; font-size:23px; }
+        .calendar-loading { position:absolute; inset:36px 0 0; z-index:5; display:flex; align-items:center; justify-content:center; flex-direction:column; background:rgba(247,246,242,.94); font-size:18px; text-align:center; line-height:1.6; pointer-events:all; }
+        .spinner { width:24px; height:24px; border:3px solid #dedbd4; border-top-color:#234f43; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:12px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @media(prefers-reduced-motion:reduce) { .spinner { animation:none; } }
+        .slot-picker { position:fixed; inset:0; z-index:50; background:#0006; display:flex; align-items:center; justify-content:center; padding:16px; }
+        .slot-picker-inner { background:#fff; padding:20px; border-radius:8px; width:min(100%,360px); }
+        .slot-picker-inner p { margin:0 0 12px; }
+        .slot-options { display:flex; gap:8px; margin-bottom:12px; }
+        .slot-options button { flex:1; min-height:48px; }
+        @media(max-width:767px) {
+            #datePanel .schedule-scroll { margin:0 -10px; height:calc(100dvh - 240px); }
+            #datePanel .schedule { min-width:320px; }
+            #datePanel .date-dock { padding:6px 12px calc(6px + env(safe-area-inset-bottom)); }
+            #datePanel .date-dock .btn { min-height:44px; padding:8px; }
+        }
     </style>
 </head>
 
@@ -170,15 +203,15 @@
         <select id="time" hidden disabled aria-hidden="true"><option value=""></option></select>
         <p id="timeStatus" class="hint" role="status"></p>
         <div id="timeButtons" class="time-buttons" role="group" aria-label="予約可能時間" hidden></div>
-        <div class="week-nav"><button id="prevWeek" type="button">前の7日間</button><span id="weekLabel"></span><button id="nextWeek" type="button">次の7日間</button></div>
-        <p class="hint">◎：予約可能　黒：予約不可（休業・満席など）<br>横にスクロールして7日分をご覧いただけます。</p>
+        <div class="week-nav"><button id="prevWeek" type="button" aria-label="前の7日間">‹</button><span id="weekLabel"></span><button id="nextWeek" type="button" aria-label="次の7日間">›</button></div>
         <p id="weekStatus" class="hint" role="status"></p>
         <button id="retryWeek" type="button" hidden>空き状況を再取得</button>
-        <div class="schedule-scroll" tabindex="0" role="region" aria-label="7日間の予約可能時間"><table id="schedule" class="schedule" aria-label="予約可能時間一覧"></table></div>
+        <div id="calendarRegion" class="schedule-scroll" tabindex="0" role="region" aria-label="7日間の予約可能時間"><table id="schedule" class="schedule" aria-label="予約可能時間一覧"></table><div id="calendarLoading" class="calendar-loading" role="status" hidden><span class="spinner" aria-hidden="true"></span><span>空き状況を<br>読み込んでいます…</span></div></div>
     </div>
 
-        <div class="date-dock"><p id="selectionStatus" class="hint" role="status" aria-live="polite">◎から日時を選択してください</p><button class="btn" id="toCustomer" type="button" disabled>お客様情報へ</button></div>
+        <div class="date-dock"><p id="selectionStatus" class="hint" role="status" aria-live="polite">◎から開始時刻を選択（黒は予約不可）</p><button class="btn" id="toCustomer" type="button" disabled>お客様情報へ</button></div>
     </section>
+    <div id="slotPicker" class="slot-picker" hidden role="dialog" aria-modal="true" aria-labelledby="slotPickerLabel"><div class="slot-picker-inner"><p id="slotPickerLabel"></p><div id="slotOptions" class="slot-options"></div><button id="closeSlotPicker" type="button">閉じる</button></div></div>
     <section class="panel" id="customerPanel" aria-labelledby="customerHeading" hidden>
         <h2 id="customerHeading" tabindex="-1">お客様情報</h2>
         <label for="name">お名前（フルネーム）</label>
@@ -312,6 +345,7 @@ function showStep(step, focus = true) {
     if (step !== 'menu' && !selectedMenu()) return;
     if ((step === 'customer' || step === 'review') && !bookingReady()) return;
     if (step === 'review' && (!nameInput.value.trim() || !normalizedPhone(phoneInput.value))) return;
+    if (step !== 'date') closeSlotPicker();
     flowStep = step;
     if (step !== 'review') reviewedSelection = null;
     renderFlow();
@@ -333,13 +367,14 @@ function renderFlow() {
         submitBtn.disabled = true;
         return;
     }
+    document.getElementById('bookingForm').setAttribute('data-step', flowStep);
     const menu = selectedMenu();
     flowSteps.forEach(step => document.getElementById('step-' + step).setAttribute('aria-current', flowStep === step ? 'step' : 'false'));
     flowSteps.forEach(step => { document.getElementById(step + 'Panel').hidden = flowStep !== step; });
     document.getElementById('flowProgress').textContent = (flowSteps.indexOf(flowStep) + 1) + ' / 4　' +
         ({menu:'メニュー',date:'日付・時間',customer:'お客様情報',review:'予約内容確認'})[flowStep];
     document.getElementById('menuSummary').hidden = !menu || flowStep === 'menu';
-    document.getElementById('menuSummaryText').textContent = menu ? menu.name + '\n' + menu.price + ' / ' + menu.durationMinutes + '分' : '';
+    document.getElementById('menuSummaryText').textContent = menu ? menu.name + (flowStep === 'date' ? '　' : '\n') + menu.price + ' / ' + menu.durationMinutes + '分' : '';
     document.getElementById('dateSummary').hidden = flowStep !== 'customer' && flowStep !== 'review';
     document.getElementById('dateSummaryText').textContent = dateInput.value + '　' + timeSelect.value;
     document.getElementById('timeContext').textContent = dateInput.value ? dateInput.value + ' の予約可能時間' : '';
@@ -426,6 +461,8 @@ function addDays(date, days) {
     return value.toISOString().slice(0,10);
 }
 function invalidateWeek() {
+    closeSlotPicker();
+    document.getElementById('calendarLoading').hidden = true;
     pendingSlot = null;
     weekLoadingKey = null;
     weekVersion++;
@@ -441,6 +478,8 @@ function validAvailability(data, date, menuId) {
 function renderWeek() {
     const table = document.getElementById('schedule'); table.replaceChildren();
     table.setAttribute('aria-busy', String(!!pendingSlot || !!weekLoadingKey));
+    document.getElementById('calendarLoading').hidden = !weekLoadingKey;
+    document.getElementById('calendarRegion').setAttribute('aria-busy', String(!!weekLoadingKey));
     const head = document.createElement('thead'), header = document.createElement('tr');
     const corner = document.createElement('th'); corner.textContent = '時刻'; header.appendChild(corner);
     weekDays.forEach(day => {
@@ -462,42 +501,26 @@ function renderWeek() {
         }
     });
     const body = document.createElement('tbody');
-    const labels = [...times].sort();
+    let labels = [...times].sort();
+    // Long days use half-hour bands; short API ranges retain exact ten-minute rows.
+    const grouped = labels.length > 18;
+    const band = time => time.slice(0,3) + (Number(time.slice(3)) < 30 ? '00' : '30');
+    if (grouped) labels = [...new Set(labels.map(band))];
     if (!labels.length) labels.push('—');
     labels.forEach(time => {
         const row = document.createElement('tr'), label = document.createElement('th');
         label.textContent = time; label.setAttribute('scope','row'); row.appendChild(label);
         weekDays.forEach(day => {
             const cell = document.createElement('td');
-            const canBook = day.data && !day.data.isClosed && day.data.availableStartTimes.includes(time);
+            const choices = day.data && !day.data.isClosed ? [...new Set(day.data.availableStartTimes)].filter(t => grouped ? band(t) === time : t === time).sort() : [];
+            const canBook = choices.length > 0;
             if (canBook) {
                 const button = document.createElement('button'); button.type = 'button'; button.textContent = '◎';
                 button.disabled = submitting || !!pendingSlot || weekMenuId !== menuSelect.value;
-                button.setAttribute('aria-label', day.date + ' ' + time + ' 予約可能');
-                button.setAttribute('aria-pressed', String(pendingSlot ? pendingSlot.date === day.date && pendingSlot.time === time : dateInput.value === day.date && timeSelect.value === time));
+                button.setAttribute('aria-label', day.date + ' ' + time + (grouped ? 'から30分間の開始時刻を選択' : ' 予約可能'));
+                button.setAttribute('aria-pressed', String(pendingSlot ? pendingSlot.date === day.date && choices.includes(pendingSlot.time) : dateInput.value === day.date && choices.includes(timeSelect.value)));
                 const version = weekVersion;
-                button.addEventListener('click', async () => {
-                    if (submitting || completed || pendingSlot || version !== weekVersion || weekMenuId !== menuSelect.value) return;
-                    if (bookingReady() && dateInput.value === day.date && timeSelect.value === time) return;
-                    dateInput.value = day.date;
-                    calendarMonth = day.date.slice(0,7);
-                    const slot = {date:day.date, time};
-                    pendingSlot = slot;
-                    const pending = loadAvailability();
-                    document.getElementById('selectionStatus').textContent = '選択中：' + day.date + ' ' + time + '（空き状況を再確認中…）';
-                    renderWeek();
-                    const selectionRequest = requestId;
-                    await pending;
-                    if (pendingSlot !== slot) return;
-                    pendingSlot = null;
-                    renderWeek();
-                    document.getElementById('selectionStatus').textContent = checkedKey === selectionKey() && availableTimes.includes(time) ?
-                        '選択中：' + day.date + ' ' + time : 'この日時を選択できません。別の◎を選んでください。';
-                    if (selectionRequest !== requestId || version !== weekVersion || dateInput.value !== day.date || checkedKey !== selectionKey() || !availableTimes.includes(time)) return;
-                    timeSelect.value = time;
-                    timeStatus.textContent = '選択中：' + day.date + ' ' + time;
-                    updateSubmit(); renderWeek();
-                });
+                button.addEventListener('click', () => grouped ? openSlotPicker(day.date, choices, version, button) : selectWeekSlot(day.date, time, version));
                 cell.appendChild(button);
             } else {
                 cell.className = day.data ? 'unavailable' : 'unknown';
@@ -510,6 +533,68 @@ function renderWeek() {
     });
     table.appendChild(body);
 }
+function selectWeekSlot(date, time, version) {
+    return recheckWeekSlot(date, time, version);
+}
+async function recheckWeekSlot(date, time, version) {
+    if (submitting || completed || pendingSlot || version !== weekVersion || weekMenuId !== menuSelect.value) return;
+    if (bookingReady() && dateInput.value === date && timeSelect.value === time) return;
+    dateInput.value = date;
+    calendarMonth = date.slice(0,7);
+    const slot = {date:date, time};
+    pendingSlot = slot;
+    const pending = loadAvailability();
+    document.getElementById('selectionStatus').textContent = '選択中：' + date + ' ' + time + '（空き状況を再確認中…）';
+    renderWeek();
+    const selectionRequest = requestId;
+    await pending;
+    if (pendingSlot !== slot) return;
+    pendingSlot = null;
+    renderWeek();
+    document.getElementById('selectionStatus').textContent = checkedKey === selectionKey() && availableTimes.includes(time) ?
+        '選択中：' + date + ' ' + time : 'この日時を選択できません。別の◎を選んでください。';
+    if (selectionRequest !== requestId || version !== weekVersion || dateInput.value !== date || checkedKey !== selectionKey() || !availableTimes.includes(time)) return;
+    timeSelect.value = time;
+    timeStatus.textContent = '選択中：' + date + ' ' + time;
+    updateSubmit(); renderWeek();
+
+}
+
+let slotPickerTrigger = null;
+let slotPickerPressed = false;
+function closeSlotPicker() {
+    document.getElementById('slotPicker').hidden = true;
+    if (slotPickerTrigger) {
+        slotPickerTrigger.setAttribute('aria-pressed', String(slotPickerPressed));
+        slotPickerTrigger.focus();
+    }
+    slotPickerTrigger = null;
+}
+function openSlotPicker(date, choices, version, trigger) {
+    if (completed || submitting || pendingSlot || version !== weekVersion) return;
+    slotPickerTrigger = trigger;
+    slotPickerPressed = dateInput.value === date && choices.includes(timeSelect.value);
+    trigger.setAttribute('aria-pressed', 'true');
+    const picker = document.getElementById('slotPicker');
+    const options = document.getElementById('slotOptions'); options.replaceChildren();
+    document.getElementById('slotPickerLabel').textContent = date + ' 開始時刻を選択';
+    choices.forEach(time => {
+        const button = document.createElement('button'); button.type = 'button'; button.textContent = time;
+        button.addEventListener('click', () => { closeSlotPicker(); return selectWeekSlot(date, time, version); });
+        options.appendChild(button);
+    });
+    picker.hidden = false;
+    options.children[0].focus();
+}
+document.getElementById('closeSlotPicker').addEventListener('click', closeSlotPicker);
+document.getElementById('slotPicker').addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeSlotPicker();
+    if (event.key === 'Tab') {
+        const buttons = [...document.getElementById('slotOptions').children, document.getElementById('closeSlotPicker')];
+        const index = buttons.indexOf(document.activeElement);
+        event.preventDefault(); buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
+    }
+});
 let weekLoadingKey = null;
 async function loadWeek(retryFailed = false) {
     if (completed || !selectedMenu() || submitting) return;
@@ -534,7 +619,7 @@ async function loadWeek(retryFailed = false) {
     const timer = setTimeout(() => controller.abort(), 30000);
     document.getElementById('weekLabel').textContent = weekStart.slice(5).replace('-','/') + '〜' + addDays(weekStart,6).slice(5).replace('-','/');
     document.getElementById('prevWeek').disabled = weekStart <= dateInput.min;
-    document.getElementById('weekStatus').textContent = '空き状況を確認中...';
+    document.getElementById('weekStatus').textContent = '';
     document.getElementById('retryWeek').hidden = true;
     renderWeek();
     try {
@@ -561,7 +646,7 @@ async function loadWeek(retryFailed = false) {
             const failed = weekDays.some(day=>day.error);
             document.getElementById('weekStatus').textContent = failed ? '取得できない日があります。再取得してください。' :
                 weekDays.some(day=>day.data && !day.data.isClosed && day.data.availableStartTimes.length) ?
-                '◎をタップして日時を選択してください。' : 'この7日間は予約できる時間がありません。';
+                '' : 'この7日間は予約できる時間がありません。';
             document.getElementById('retryWeek').hidden = !failed;
         }
     }
@@ -645,7 +730,7 @@ function showNotice(message) {
 
 function resetTimes(message) {
     reviewedSelection = null;
-    document.getElementById('selectionStatus').textContent = '◎から日時を選択してください';
+    document.getElementById('selectionStatus').textContent = '◎から開始時刻を選択（黒は予約不可）';
     timeButtons.replaceChildren();
     timeStatus.textContent = message;
     availableTimes = [];
