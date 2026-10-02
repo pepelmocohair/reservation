@@ -18,7 +18,7 @@ measure = '''setTimeout(()=>{
  const region=document.getElementById('calendarRegion'), headers=[...document.querySelectorAll('#schedule thead th')].slice(1), rows=[...document.querySelectorAll('#schedule tbody tr')];
  const at16=rows.find(r=>r.firstChild.textContent==='16:00');
  const weekdays=headers.map(h=>h.querySelector('.schedule-weekday'));
- const headerStyles=weekdays.map(e=>({text:e.textContent,className:e.className,color:getComputedStyle(e).color,dateColor:getComputedStyle(e.previousElementSibling).color}));
+ const headerStyles=weekdays.map(e=>({text:e.textContent,className:e.className,headerClass:e.parentElement.className,background:getComputedStyle(e.parentElement).backgroundColor,color:getComputedStyle(e).color,dateColor:getComputedStyle(e.previousElementSibling).color}));
  const data={headerStyles,width:innerWidth,height:innerHeight,region:rect(region),headers:headers.map(rect),at16:at16?rect(at16):null,dock:rect(document.querySelector('.date-dock')),loading:!document.getElementById('calendarLoading').hidden,button:rect(document.querySelector('#schedule button')||document.getElementById('nextWeek')),overflow:document.documentElement.scrollWidth>innerWidth};
  const out=document.createElement('pre');out.id='layoutResult';out.textContent=JSON.stringify(data);out.hidden=true;document.body.appendChild(out);
 },100);
@@ -36,8 +36,12 @@ with tempfile.TemporaryDirectory(prefix='calendar-layout-') as folder:
    data=json.loads(result.stdout);measurements[state]=data
    assert len(data['headers'])==7
    assert [h['text'] for h in data['headerStyles']]==['月','火','水','木','金','土','日']
-   assert all(h['className']=='schedule-weekday' for h in data['headerStyles'][:5])
-   assert all(h['className']=='schedule-weekday weekend' and h['color']=='rgb(180, 35, 35)' and h['dateColor']!=h['color'] for h in data['headerStyles'][5:])
+   assert all(h['className']=='schedule-weekday' for h in data['headerStyles'])
+   assert all(h['headerClass']=='' and h['color']==h['dateColor']=='rgb(34, 34, 34)' for h in data['headerStyles'][:5])
+   for index,style,color in [(5,'saturday','rgb(36, 89, 166)'),(6,'sunday','rgb(180, 35, 35)')]:
+    assert data['headerStyles'][index]['headerClass']==style
+    assert data['headerStyles'][index]['color']==data['headerStyles'][index]['dateColor']==color
+   assert all(h['background']=='rgb(247, 246, 242)' for h in data['headerStyles'])
    assert not data['overflow']
    if width>=390:
     assert all(h['x']>=0 and h['right']<=width for h in data['headers'])

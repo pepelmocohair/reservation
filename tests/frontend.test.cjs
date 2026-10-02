@@ -468,11 +468,12 @@ test('selected date opens its Monday week, keeping selected date distinct from w
  assert.equal(new URL(req.url).searchParams.get('startDate'),'2099-01-05');assert.equal(s.els.date.value,'2099-01-06');assert.equal(s.run('weekDays[6].date'),'2099-01-11');
  req.resolve(weekResponse(req));await new Promise(setImmediate);
 });
-test('only weekend weekday spans carry colour class, and open Saturday/Sunday remain selectable',async()=>{
+test('Saturday date and weekday are blue, Sunday red, and both remain selectable',async()=>{
  const s=setup();await ready(s);s.run("selectMenu('m1')");await weekReady(s);
  const headers=s.els.schedule.children[0].children[0].children.slice(1);
- assert.deepEqual(headers.map(h=>h.children[1].className),['schedule-weekday','schedule-weekday','schedule-weekday','schedule-weekday','schedule-weekday','schedule-weekday weekend','schedule-weekday weekend']);
- assert.ok(headers.every(h=>h.children[0].className==='schedule-date'));assert.match(html,/\.schedule-weekday\.weekend\s*\{\s*color:#b42323;/);
+ assert.deepEqual(headers.map(h=>h.className),['','','','','','saturday','sunday']);
+ assert.ok(headers.every(h=>h.children[1].className==='schedule-weekday'));
+ assert.ok(headers.every(h=>h.children[0].className==='schedule-date'));assert.match(html,/\.schedule thead th\.saturday\s*\{\s*color:#2459a6;/);assert.match(html,/\.schedule thead th\.sunday\s*\{\s*color:#b42323;/);
  for(const column of [6,7]){
   const p=s.els.schedule.children[1].children[1].children[column].children[0].events.click(),req=s.requests.shift();
   req.resolve(response(new URL(req.url).searchParams.get('date')));await p;assert.equal(s.els.toCustomer.disabled,false);assert.equal(s.els.toCustomer.textContent,'お客様情報へ');

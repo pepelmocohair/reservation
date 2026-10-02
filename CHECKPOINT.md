@@ -222,3 +222,9 @@ TZ=Asia/Tokyo node tests/backend.test.cjs
 - frontend102/102 PASS（既存85件のassertを維持、17件追加）。日時依存テストを固定時計（通常fixtureは月曜2026-10-05）にし、新規テストでは月〜日の全7曜日を別時計で確認。追加は月曜/日曜境界・過去日黒/直接選択拒否の7件、月跨ぎ/年跨ぎ/閏日/元日日曜4件、±7日の移動制限、入力日の月曜正規化、選択日と表示開始日の分離、土日classと土日予約可能、月/年跨ぎの前後移動2件。ローカルの未変更backend105/105 PASS、計207/207 PASS。diff --check PASS。
 - ローカル模擬APIのChromeで320×740・390×844・430×932（追加768×1024）をLoading前後8画面で検証・画像確認。月〜日の並び、土日曜日のcomputed color赤/日付数字は従来色をassert。既存レイアウト・再確認ボタンのassertもすべて維持してPASS。390/430pxでは月〜日7列が画面内で認識でき、390×844は10:00〜16:30を確認。320pxは従来同様、日曜列に横スクロールが必要（タップ領域・表最小幅を維持）。生成画像は/tmp/calendar-{幅}-{loaded|loading}.png、commit対象外。実機確認は未実施。
 - 作業ブランチへのcommitのみ。mainへのmerge/push、本ブランチpush、本番公開・本番GAS/Sheets変更なし。バックエンド作業ツリーと元mainに差分なし。未追跡references/は維持しcommit対象外。SHAは本節を含むux/mobile-speed-v1のGit履歴で確認。
+
+## 2026-10-02 土曜青・日曜赤のヘッダー視認性改善（未公開）
+
+- 月曜〜日曜固定の7列を維持し、土曜ヘッダーにsaturday、日曜ヘッダーにsunday classを付与。日付数字と曜日の両方を土曜#2459a6（青）、日曜#b42323（赤）へ変更。月〜金は従来の文字色。theadの文字色のみを変更し、背景や予約可否セル・ハイライト・営業/休業の条件は変更なし。
+- frontend102/102 PASS。土日class・文字色の期待値を新仕様へ更新し、土日もAPI許可なら◎選択・再確認成功で次へが有効になるassertを維持。Chromeで320/390/430/768pxのLoading前後8画面を検証し、日付/曜日の色一致、月〜金の従来色、全ヘッダー背景の従来色、月〜日の並びと既存レイアウト/再確認assertがPASS。320/390/430pxの画像を確認。390/430pxは青い土曜・赤い日曜を7列内で認識可能。320pxでの日曜列への横スクロール制約は従来どおり。diff --check PASS。
+- ux/mobile-speed-v1へのcommitのみ。backend、main、push、本番GAS/Sheets/deployment・公開に変更なし。未追跡references/は維持しcommit対象外。
