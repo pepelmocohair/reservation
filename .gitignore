@@ -24,3 +24,6 @@ playwright-report/
 .DS_Store
 /work/
 /outputs/
+
+# User-provided reference screenshots (keep local)
+/references/

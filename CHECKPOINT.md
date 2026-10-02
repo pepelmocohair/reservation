@@ -255,3 +255,22 @@ TZ=Asia/Tokyo node tests/backend.test.cjs
 - 任意欄のラベル、補助文/カウンター削除、2行/80px、フロント/バックエンド100文字上限は前節どおり維持。今回バックエンドのソース・列設計は変更なし。
 - frontend113/113、backend123/123、計236/236 PASS。新しい全文・改行/段落・確認ラベル/必須属性の厳密テストを追加。4幅の既存Chrome検証を全実行してPASS（日時・メニューLoading・Step3/4・ポリシーの操作/固定下部ボタンとの位置関係）。390pxの新本文を画像確認。git diff --check PASS。
 - 実機向けローカルプレビューを新本文で再起動。本番GAS/Sheets/main/merge/push/公開は未変更。今回変更ファイルはindex.html、tests/frontend.test.cjs、CHECKPOINT.md。ブランチcommit SHAは本節を含むGit履歴で確認。
+
+## 2026-10-02 作業終了チェックポイント（最新状態）
+
+- frontend/backendとも作業ブランチは `ux/mobile-speed-v1`。本日の最終実装commitは frontend `000b41f5ce7ad40c647c84da92665e71ffb82528`、backend `4fdf85e59e9d17a8e03050b9a2063669b2ab9888`。この後の終了記録commitのSHAは各ブランチの `git log -1` で確認する（自身のSHAは本文へ埋め込めない）。
+- 本日実装：モバイル日時画面の圧縮とカレンダー領域内Loading、4ステップ・即時ハイライト・再確認中ボタン・連打/旧応答防止、開始30分刻みと内部slotMinutes=10の分離、時刻モーダル撤去、月曜〜日曜固定週・過去日不可・土曜青/日曜赤、メニューLoadingを文字だけへ簡素化。任意メッセージは2行/80px・最大100文字でフロント/バックエンド検証し、入力時のみ確認画面表示、POSTと末尾N列「ご要望」へ保存する設計。キャンセルポリシーは最新指定文面・必須確認チェック。電話・取消token・競合判定・旧予約互換を維持。
+- 終了時に全テストを再実行：`node tests/frontend.test.cjs` 113/113 PASS、backend worktreeで `node tests/backend.test.cjs` 123/123 PASS、合計236/236 PASS。両リポジトリ `git diff --check` PASS。backendの例外テストによる想定内エラーログあり。既存assertを弱めていない。直前のChromeローカル検証も320/390/430/768pxでPASS。390×844は7列と10:00〜16:30を初期表示、320pxは日曜列に横スクロールが必要。実スマホのブラウザバー/キーボード/VoiceOverは別途確認。
+- 差分確認：依頼された実装・テスト・ローカル確認用ツール・記録のみ。ユーザー参考画像references/は保持し、frontend .gitignoreへ追加して配布しない。生成画像は/tmp。自動デプロイ用.githubワークフローなし。
+- 本番未反映：本日の変更すべて。GitHubへの作業ブランチpushはソース保管のみ。mainへmergeしない、Pages公開元mainを変更しない。本番GASはVersion17のまま、clasp push/version/deploy・本番API操作・Sheets編集を行わない。A〜Mは維持、N列/見出しの本番追加は未実施、ポリシー同意の保存列は追加しない。公開時にはN未使用/列存在とAPI契約を改めて確認する。
+- 保存先：frontend `pepelmocohair/reservation`、backend `pepelmocohair/reservation-gas` の `origin/ux/mobile-speed-v1`。push後に各local HEADとoriginのSHA一致・cleanを確認する。frontend main基準は1f3037f、backend main基準は50e18f1のまま。
+- 再開地点：両CHECKPOINTの本節と各作業ブランチHEAD。backend作業場所は `/tmp/reservation-gas-start-30`（commitはreservation-gasのGit管理領域にも保存）。別端末では両repoの作業ブランチを取得し、backendパスを合わせる。実機確認の再起動方法はfrontend `LOCAL_PREVIEW.md`。ローカルメモリAPIだけで予約を保存し、本番への通信なし。
+
+次回は実装前に以下の設計を整理する。
+
+1. LINE経由 / 通常Web経由の判定設計（信頼できる判定材料と既存sourceTypeとの関係）。
+2. Web予約のみメールアドレス必須化（入力・検証・後方互換・保存方法）。
+3. SMTP/メール送信環境の検討（認証情報はGitに保存しない）。
+4. LINE予約完了通知とWebメール通知の設計（経路別の通知・送信失敗/再試行・二重送信防止）。
+
+経路判定・メール必須化・通知送信はまだ実装していない。本番反映は別途指示後。
