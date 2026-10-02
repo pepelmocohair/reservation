@@ -12,11 +12,12 @@ class Element {
  setAttribute(name,value){(this.attributes ||= {})[name]=value;}
 }
 const menu={id:'m1',category:'分類',name:'マスター名',price:'¥1,234〜',durationMinutes:70,webBookingEnabled:true,bookable:true};
-function setup(hash=''){
+function setup(hash='',today='2026-10-05'){
  const els=Object.fromEntries(['date','menu','time','name','submitBtn','loadingMsg','notice','calendar','calendarDays','monthLabel','selectedDate','menuDetails','timeButtons','timeStatus','prevMonth','nextMonth'].map(id=>[id,new Element()]));
  els.phone=new Element('', '09012345678');
  const location={hash,pathname:'/reservation/',search:''};const window={events:{},addEventListener:(e,f)=>window.events[e]=f};const history={replaceState:(a,b,url)=>{location.hash=url.slice(url.indexOf('#'));}};
- const requests=[];const ctx={location,history,window,URLSearchParams,console,Intl,Date,Set,Map,AbortController,Option:Element,encodeURIComponent,setTimeout:()=>1,clearTimeout:()=>{},
+ const ClockDate=class extends Date { constructor(...args){super(...(args.length?args:[today+'T12:00:00+09:00']));} static now(){return new Date(today+'T12:00:00+09:00').getTime();} };
+ const requests=[];const ctx={location,history,window,URLSearchParams,console,Intl,Date:ClockDate,Set,Map,AbortController,Option:Element,encodeURIComponent,setTimeout:()=>1,clearTimeout:()=>{},
  document:{getElementById:id=>(els[id] ||= new Element()),createElement:()=>new Element()},fetch:(url,options={})=>new Promise((resolve,reject)=>requests.push({url,options,resolve:data=>resolve({ok:true,json:async()=>data}),reject}))};
  vm.createContext(ctx);vm.runInContext(script,ctx);
  return {els,requests,run:s=>vm.runInContext(s,ctx)};
@@ -419,4 +420,70 @@ test('menu change during recheck clears loading button and stale response cannot
  assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,true);
  old.resolve(response(new URL(old.url).searchParams.get('date')));await p;
  assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.els.time.value,'');
+});
+
+for(let offset=0;offset<7;offset++)test('initial week is Monday through Sunday and past dates stay black for weekday '+offset,async()=>{
+ const today=new Date(Date.UTC(2026,9,5+offset)).toISOString().slice(0,10),s=setup('',today);await ready(s);
+ assert.equal(s.els.date.min,today);s.run("selectMenu('m1');showStep('date',false)");const req=s.requests.shift();
+ assert.equal(new URL(req.url).searchParams.get('startDate'),'2026-10-05');assert.equal(s.run('weekStart'),'2026-10-05');assert.equal(s.run('weekDays[6].date'),'2026-10-11');
+ assert.equal(s.els.prevWeek.disabled,true);
+ const headers=s.els.schedule.children[0].children[0].children.slice(1);
+ assert.deepEqual(headers.map(h=>h.children[1].textContent),['月','火','水','木','金','土','日']);
+ for(let column=0;column<7;column++)assert.equal(s.els.schedule.children[1].children[0].children[column+1].className,column<offset?'unavailable':'unknown');
+ req.resolve(weekResponse(req,['10:30']));await new Promise(setImmediate);
+ const row=s.els.schedule.children[1].children[1];
+ for(let column=0;column<7;column++){
+  if(column<offset){assert.equal(row.children[column+1].className,'unavailable');assert.equal(row.children[column+1].children.length,0);assert.match(row.children[column+1].attributes['aria-label'],/過去日/);}
+  else assert.equal(row.children[column+1].children[0].textContent,'◎');
+ }
+ if(offset){await s.run("selectWeekSlot('2026-10-05','10:30',weekVersion)");assert.equal(s.requests.length,0);assert.equal(s.els.time.value,'');}
+ s.els.prevWeek.events.click();assert.equal(s.run('weekStart'),'2026-10-05');assert.equal(s.requests.length,0);
+});
+for(const [today,monday,sunday,label] of [
+ ['2026-10-02','2026-09-28','2026-10-04','09/28〜10/04'],
+ ['2027-01-01','2026-12-28','2027-01-03','12/28〜01/03'],
+ ['2028-03-01','2028-02-28','2028-03-05','02/28〜03/05'],
+ ['2023-01-01','2022-12-26','2023-01-01','12/26〜01/01']
+])test('calendar boundaries across month/year/leap day: '+today,async()=>{
+ const s=setup('',today);await ready(s);s.run("selectMenu('m1')");const p=s.run('loadWeek()'),req=s.requests.shift();
+ assert.equal(new URL(req.url).searchParams.get('startDate'),monday);assert.equal(s.run('weekDays[6].date'),sunday);
+ assert.equal(new Date(monday+'T00:00:00Z').getUTCDay(),1);assert.equal(new Date(sunday+'T00:00:00Z').getUTCDay(),0);assert.equal(s.els.weekLabel.textContent,label);
+ req.resolve(weekResponse(req));await p;
+});
+test('next and previous move by exactly seven days and cannot move before the current Monday',async()=>{
+ const s=setup('','2026-10-06');await ready(s);s.run("selectMenu('m1')");await weekReady(s);
+ for(const [direction,start,end,disabled] of [[1,'2026-10-12','2026-10-18',false],[1,'2026-10-19','2026-10-25',false],[-1,'2026-10-12','2026-10-18',false],[-1,'2026-10-05','2026-10-11',true]]){
+  s.run('moveWeek('+direction+')');const req=s.requests.shift();assert.equal(new URL(req.url).searchParams.get('startDate'),start);assert.equal(s.run('weekDays[6].date'),end);assert.equal(s.els.prevWeek.disabled,disabled);
+  req.resolve(weekResponse(req));await new Promise(setImmediate);
+ }
+ s.run('moveWeek(-1)');assert.equal(s.requests.length,0);assert.equal(s.run('weekStart'),'2026-10-05');
+});
+test('loadWeek normalizes requested date to Monday and clamps entirely past weeks to current week',async()=>{
+ const s=setup('','2026-10-06');await ready(s);s.run("selectMenu('m1');weekStart='2026-10-16'");let p=s.run('loadWeek()'),req=s.requests.shift();
+ assert.equal(new URL(req.url).searchParams.get('startDate'),'2026-10-12');req.resolve(weekResponse(req));await p;
+ s.run("weekStart='2026-09-15'");p=s.run('loadWeek()');req=s.requests.shift();assert.equal(new URL(req.url).searchParams.get('startDate'),'2026-10-05');req.resolve(weekResponse(req));await p;
+});
+test('selected date opens its Monday week, keeping selected date distinct from weekly start',async()=>{
+ const s=setup();await ready(s);s.run("selectMenu('m1');dateInput.value='2099-01-06';showStep('date',false)");const req=s.requests.shift();
+ assert.equal(new URL(req.url).searchParams.get('startDate'),'2099-01-05');assert.equal(s.els.date.value,'2099-01-06');assert.equal(s.run('weekDays[6].date'),'2099-01-11');
+ req.resolve(weekResponse(req));await new Promise(setImmediate);
+});
+test('only weekend weekday spans carry colour class, and open Saturday/Sunday remain selectable',async()=>{
+ const s=setup();await ready(s);s.run("selectMenu('m1')");await weekReady(s);
+ const headers=s.els.schedule.children[0].children[0].children.slice(1);
+ assert.deepEqual(headers.map(h=>h.children[1].className),['schedule-weekday','schedule-weekday','schedule-weekday','schedule-weekday','schedule-weekday','schedule-weekday weekend','schedule-weekday weekend']);
+ assert.ok(headers.every(h=>h.children[0].className==='schedule-date'));assert.match(html,/\.schedule-weekday\.weekend\s*\{\s*color:#b42323;/);
+ for(const column of [6,7]){
+  const p=s.els.schedule.children[1].children[1].children[column].children[0].events.click(),req=s.requests.shift();
+  req.resolve(response(new URL(req.url).searchParams.get('date')));await p;assert.equal(s.els.toCustomer.disabled,false);assert.equal(s.els.toCustomer.textContent,'お客様情報へ');
+ }
+});
+
+for(const [today,start,next] of [['2026-09-30','2026-09-28','2026-10-05'],['2026-12-30','2026-12-28','2027-01-04']])test('week navigation crosses month/year and returns to exact Monday: '+today,async()=>{
+ const s=setup('',today);await ready(s);s.run("selectMenu('m1')");await weekReady(s);assert.equal(s.run('weekStart'),start);
+ for(const [delta,expected] of [[1,next],[-1,start]]){
+  s.run('moveWeek('+delta+')');const req=s.requests.shift();assert.equal(new URL(req.url).searchParams.get('startDate'),expected);
+  const dates=JSON.parse(s.run('JSON.stringify(weekDays.map(d=>d.date))'));assert.equal(dates.length,7);assert.equal(new Date(dates[0]+'T00:00:00Z').getUTCDay(),1);assert.equal(new Date(dates[6]+'T00:00:00Z').getUTCDay(),0);
+  req.resolve(weekResponse(req));await new Promise(setImmediate);
+ }
 });

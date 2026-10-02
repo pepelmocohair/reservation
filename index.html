@@ -71,6 +71,8 @@
         .schedule thead th:first-child { z-index:4; }
         .schedule button { width:100%; height:44px; min-height:44px; padding:0; line-height:1; border:0; border-radius:0; font-size:23px; color:#49665b; background:white; }
         .schedule button[aria-pressed="true"] { background:#dbe5dd; color:#222; box-shadow:inset 0 0 0 3px #49665b; }
+        .schedule-date, .schedule-weekday { display:block; }
+        .schedule-weekday.weekend { color:#b42323; }
         .schedule .unavailable { background:#292929; color:#fff; }
         .schedule .unknown { background:#f0eee7; color:#666; }
         .schedule button:focus-visible { outline-offset:-4px; }
@@ -198,7 +200,7 @@
         <select id="time" hidden disabled aria-hidden="true"><option value=""></option></select>
         <p id="timeStatus" class="hint" role="status"></p>
         <div id="timeButtons" class="time-buttons" role="group" aria-label="予約可能時間" hidden></div>
-        <div class="week-nav"><button id="prevWeek" type="button" aria-label="前の7日間">‹</button><span id="weekLabel"></span><button id="nextWeek" type="button" aria-label="次の7日間">›</button></div>
+        <div class="week-nav"><button id="prevWeek" type="button" aria-label="前の週">‹</button><span id="weekLabel"></span><button id="nextWeek" type="button" aria-label="次の週">›</button></div>
         <p id="weekStatus" class="hint" role="status"></p>
         <button id="retryWeek" type="button" hidden>空き状況を再取得</button>
         <div id="calendarRegion" class="schedule-scroll" tabindex="0" role="region" aria-label="7日間の予約可能時間"><table id="schedule" class="schedule" aria-label="予約可能時間一覧"></table><div id="calendarLoading" class="calendar-loading" role="status" hidden><span class="spinner" aria-hidden="true"></span><span>空き状況を<br>読み込んでいます…</span></div></div>
@@ -345,7 +347,7 @@ function showStep(step, focus = true) {
     if (step === 'date') {
         const start = dateInput.value || dateInput.min;
         const hasWeek = weekMenuId === menuSelect.value && weekDays.length === 7 && weekDays.some(day => day.date === start);
-        if (!hasWeek) { weekStart = start; loadWeek(); }
+        if (!hasWeek) { weekStart = mondayOf(start); loadWeek(); }
     }
     if (focus) {
         const headings = {menu:'menuHeading',date:'dateLabel',customer:'customerHeading',review:'reviewHeading'};
@@ -418,7 +420,7 @@ function selectMenu(id, toggle = false) {
     if (availabilityController) availabilityController.abort();
     invalidateWeek();
     dateInput.value = '';
-    weekStart = dateInput.min;
+    weekStart = mondayOf(dateInput.min);
     resetTimes('日時を選択してください');
     renderCalendar();
     renderMenuCards();
@@ -444,8 +446,8 @@ document.getElementById('editMenu').addEventListener('click', () => showStep('me
 ['editDate','backDate'].forEach(id => document.getElementById(id).addEventListener('click', () => showStep('date')));
 document.getElementById('backCustomer').addEventListener('click', () => showStep('customer'));
 
-// 表の行は表示用の目盛り。選択可否は各日のavailableStartTimesだけで決める。
-let weekStart = dateInput.min;
+// 表の行は表示用の目盛り。今日以降の選択可否は各日のavailableStartTimesで決める。
+let weekStart = mondayOf(dateInput.min);
 let weekVersion = 0;
 let weekController = null;
 let weekDays = [];
@@ -454,6 +456,10 @@ function addDays(date, days) {
     const value = new Date(date + 'T00:00:00Z');
     value.setUTCDate(value.getUTCDate() + days);
     return value.toISOString().slice(0,10);
+}
+function mondayOf(date) {
+    const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
+    return addDays(date, -((weekday + 6) % 7));
 }
 function invalidateWeek() {
     document.getElementById('calendarLoading').hidden = true;
@@ -487,8 +493,14 @@ function renderWeek() {
     const corner = document.createElement('th'); corner.textContent = '時刻'; header.appendChild(corner);
     weekDays.forEach(day => {
         const th = document.createElement('th'); th.setAttribute('scope','col');
-        const weekday = ['日','月','火','水','木','金','土'][new Date(day.date + 'T00:00:00Z').getUTCDay()];
-        th.textContent = day.date.slice(5).replace('-','/') + '\n' + weekday;
+        const weekdayIndex = new Date(day.date + 'T00:00:00Z').getUTCDay();
+        const weekday = ['日','月','火','水','木','金','土'][weekdayIndex];
+        const dateLabel = document.createElement('span'); dateLabel.className = 'schedule-date';
+        dateLabel.textContent = day.date.slice(5).replace('-','/');
+        const weekdayLabel = document.createElement('span');
+        weekdayLabel.className = 'schedule-weekday' + (weekdayIndex === 0 || weekdayIndex === 6 ? ' weekend' : '');
+        weekdayLabel.textContent = weekday;
+        th.appendChild(dateLabel); th.appendChild(weekdayLabel);
         header.appendChild(th);
     });
     head.appendChild(header); table.appendChild(head);
@@ -511,7 +523,8 @@ function renderWeek() {
         label.textContent = time; label.setAttribute('scope','row'); row.appendChild(label);
         weekDays.forEach(day => {
             const cell = document.createElement('td');
-            const canBook = day.data && !day.data.isClosed && day.data.availableStartTimes.includes(time);
+            const past = day.date < dateInput.min;
+            const canBook = !past && day.data && !day.data.isClosed && day.data.availableStartTimes.includes(time);
             if (canBook) {
                 const button = document.createElement('button'); button.type = 'button'; button.textContent = '◎';
                 button.disabled = submitting || !!pendingSlot || weekMenuId !== menuSelect.value;
@@ -521,9 +534,9 @@ function renderWeek() {
                 button.addEventListener('click', () => selectWeekSlot(day.date, time, version));
                 cell.appendChild(button);
             } else {
-                cell.className = day.data ? 'unavailable' : 'unknown';
-                cell.textContent = day.data ? '' : day.error ? '再取得' : '…';
-                cell.setAttribute('aria-label',day.date + ' ' + time + (day.data ? ' 予約不可' : day.error ? ' 取得失敗' : ' 取得中'));
+                cell.className = past || day.data ? 'unavailable' : 'unknown';
+                cell.textContent = past || day.data ? '' : day.error ? '再取得' : '…';
+                cell.setAttribute('aria-label',day.date + ' ' + time + (past ? ' 過去日のため予約不可' : day.data ? ' 予約不可' : day.error ? ' 取得失敗' : ' 取得中'));
             }
             row.appendChild(cell);
         });
@@ -536,7 +549,7 @@ function selectWeekSlot(date, time, version) {
 }
 async function recheckWeekSlot(date, time, version) {
     if (submitting || completed || pendingSlot || version !== weekVersion || weekMenuId !== menuSelect.value) return;
-    if (!isCustomerStartTime(time)) return;
+    if (date < dateInput.min || !isCustomerStartTime(time)) return;
     if (bookingReady() && dateInput.value === date && timeSelect.value === time) return;
     dateInput.value = date;
     calendarMonth = date.slice(0,7);
@@ -564,6 +577,9 @@ async function recheckWeekSlot(date, time, version) {
 let weekLoadingKey = null;
 async function loadWeek(retryFailed = false) {
     if (completed || !selectedMenu() || submitting) return;
+    const currentWeek = mondayOf(dateInput.min);
+    weekStart = mondayOf(weekStart);
+    if (weekStart < currentWeek) weekStart = currentWeek;
     const menuId = menuSelect.value;
     const key = menuId + '|' + weekStart;
     if (weekLoadingKey === key) return;
@@ -584,7 +600,7 @@ async function loadWeek(retryFailed = false) {
     const controller = new AbortController(); weekController = controller;
     const timer = setTimeout(() => controller.abort(), 30000);
     document.getElementById('weekLabel').textContent = weekStart.slice(5).replace('-','/') + '〜' + addDays(weekStart,6).slice(5).replace('-','/');
-    document.getElementById('prevWeek').disabled = weekStart <= dateInput.min;
+    document.getElementById('prevWeek').disabled = weekStart <= currentWeek;
     document.getElementById('weekStatus').textContent = '';
     document.getElementById('retryWeek').hidden = true;
     renderWeek();
@@ -611,7 +627,7 @@ async function loadWeek(retryFailed = false) {
             renderWeek();
             const failed = weekDays.some(day=>day.error);
             document.getElementById('weekStatus').textContent = failed ? '取得できない日があります。再取得してください。' :
-                weekDays.some(day=>day.data && !day.data.isClosed && day.data.availableStartTimes.length) ?
+                weekDays.some(day=>day.date >= dateInput.min && day.data && !day.data.isClosed && day.data.availableStartTimes.length) ?
                 '' : 'この7日間は予約できる時間がありません。';
             document.getElementById('retryWeek').hidden = !failed;
         }
@@ -620,7 +636,8 @@ async function loadWeek(retryFailed = false) {
 function moveWeek(delta) {
     if (submitting || completed) return;
     const next = addDays(weekStart,delta*7);
-    weekStart = next < dateInput.min ? dateInput.min : next;
+    if (next < mondayOf(dateInput.min)) return;
+    weekStart = next;
     resetTimes('日時を選択してください');
     loadWeek();
 }
@@ -657,7 +674,7 @@ function renderCalendar() {
             dateInput.value = date;
             renderCalendar();
             loadAvailability();
-            weekStart = date; loadWeek();
+            weekStart = mondayOf(date); loadWeek();
         });
         calendarDays.appendChild(button);
     }
