@@ -126,3 +126,45 @@ TZ=Asia/Tokyo node tests/backend.test.cjs
 ## 復旧時の注意
 
 過去の記録ではVersion 13が旧30分版として残る。現在の復旧候補として使えるかは再確認が必要。既存deploymentの参照版を変更しURLを維持する方針だが、週間・複数メニュー対応フロントをGASだけ戻して復旧できるとは限らない。対応するフロント版と、新予約データ（H:K）の読取互換を確認する。今回復旧操作は行わない。
+
+
+## 2026-09-30 ローカル実装：電話番号・予約完了画面（未公開）
+
+- main の作業開始基準: `7badf4f`。以下は実装時の記録。現在のGit確定先・公開状態は末尾の「Git確定地点」を参照すること。
+- 新フロントの予約POSTは `requestVersion: 2` + `phone` 必須。国内0始まり10〜11桁、ハイフン・空白・全角数字を正規化し、数字だけを送信・保存。requestVersion省略の旧予約POSTのみphone省略可能（L空欄）。送信されたphoneは旧POSTでも検証。未対応Versionは拒否。単一 `menuId` / 複数 `menuIds` は維持。
+- 予約台帳「シート1」のL列を電話番号用とする。先頭0を維持する文字列として保存し、A〜Kの意味は変更しない。旧予約行のL空欄は許容。
+- フロントはPOST成功時だけ専用完了画面（予約ID・メニュー・日時・閉じてよい旨）へ切り替え、予約フォームを隠して再操作・再送信を停止。失敗時のエラー処理は維持。
+- ScriptLock、予約直前再検証、重複判定、10分刻み、週間API、J合計時間・Kメニュースナップショットを維持。
+- ローカル自動テスト: frontend 44/44、backend 62/62、合計106/106 PASS。既存78件を維持し、電話番号・完了表示・失敗時・旧行互換性を追加確認。本リポジトリは44件。
+- 本番Sheets・GAS・GitHub Pagesへの反映は未実施。本番はVersion 15、既存deployment URLを維持する。L1見出し「電話番号」・L列文字列保存の確認、新旧フロントとGASの更新順序、別環境でのブラウザ確認が反映前に必要。互換GASを先に既存deploymentへ公開し、確認後に新フロントを公開すること。phone省略の旧フロントは引き続き予約可能。
+- 2026年10月の営業日設定問題は解決済み（休業5・9・11・12・18・19・26日）。今回は営業日設定を変更していない。
+
+
+## 2026-09-30 ローカル実装：顧客キャンセル・requestVersion互換（未公開）
+
+- 本番「シート1」を読み取りのみで再確認：L1:M1000は値・数式・メモ・入力規則・個別書式が空。保存先はL=電話番号、M=キャンセルトークンSHA-256ハッシュ。A〜Kは変更しない。既存のH〜K見出しは空欄だがデータ保存用途は仕様どおり。
+- 新規WEB予約は予約ID生成と別にUtilities.getUuid()を2回使用し、ハイフン除去・連結した64桁hexトークン（ランダムUUID由来）を生成。MにはSHA-256だけ保存。平文は予約成功JSONのcancelTokenに返し、canCancelはphone有無で決める。電話なし旧POSTも予約・トークン生成は成功するが顧客キャンセルは不可。平文をログ・台帳に残さない。
+- 完了画面は予約ID・メニュー・日時・終了案内を維持し、canCancel=true時に「予約をキャンセルする」リンクを追加。予約フォームと追加予約操作は終了したまま。リンクを保存する案内あり。リンク紛失時やphone/トークンのない旧予約は店舗連絡。
+- リンク形式：公開フロントURL + #cancel=<予約ID>&token=<トークン>。電話番号・氏名なし。フラグメントはHTTPのURLへ送信されず、ページ読取後history.replaceStateで#cancelへ置換。資格はメモリのみ保持。Referrer-Policyはno-referrer。リロードする場合は保存した元リンクから開き直す。
+- 対象確認API：POST {sourceType:"WEB_PAGE", action:"cancelPreview", reservationId, cancelToken}。読み取り専用。APIのURLへ資格を載せないため、確認にもPOST本文を使う。GETのキャンセル系actionは拒否、リンクを開くGETでは台帳を変更しない。確認応答はstatus/date/time/menu/cancelledのみ。氏名・電話・トークン/ハッシュを返さない。
+- 実取消API：POST {sourceType:"WEB_PAGE", action:"cancelReservation", reservationId, cancelToken, phone}。画面に対象日時・メニューを表示し、電話番号全体を入力して明示的に「キャンセルする」を押す。電話単独/予約ID単独の検索・取消は提供しない。
+- ScriptLock取得後、IDが一意であること、トークンハッシュ、保存電話番号、G列状態を再読込・照合。確定（WEB）ならGだけ「キャンセル」に変更→flush→release。正しい全資格でキャンセル済みならsuccess/alreadyCancelled:true（再書込なし）。他の状態/存在なし/不正token/電話不一致は同じcancel_unavailable応答。行削除なし。
+- キャンセル済み行は既存の占有計算から除外され、同時間帯が再予約可能。予約側と同じScriptLockを使うため双方の書込を直列化。POST自動再試行なし。二重クリック防止・遅い応答による別対象への上書き防止あり。
+- 自動テスト：frontend 56/56、backend 90/90、合計146/146 PASS。既存106件を維持し40件追加。UUID/digest/Sheets/Lockはローカルモックで、実ブラウザ・本番API/保存検証は未実施。
+- 本番反映時：未使用再確認→L1「電話番号」/L2:L1000プレーンテキスト、M1「キャンセルトークンSHA-256」/M2:M1000プレーンテキスト→互換GASのcommit/push・新Version作成・既存deployment更新→確認→フロントcommit/push・Pages公開。本番反映は未実施。Git確定先と今回の許可範囲は末尾の「Git確定地点」を参照。Version番号/commit対応は本番反映時に記録。
+- 公開後は承認済みテスト予約でH〜M保存、リンク確認が非破壊、電話照合取消、G更新、占有解放・再予約競合拒否を確認。旧フロントphone省略互換は時間だけで終了しない。
+- 復旧にはキャンセルAPIとL/M読取・保存を維持した正常GAS版を用意する。Version15へ戻すと新キャンセルリンクAPI・電話/ハッシュ保存が失われるので、単純なGASのみ復旧を前提にしない。保存済みL/M・予約行は消さない。
+- この節はローカル実装時の記録。GitHub中央正本・2台運用のため未pushの作業を別端末で重ねない。本番Sheets・deployment・本番POST・Pages・SSH設定・営業日設定・pepelmoco-site変更は未実施。
+
+
+## 2026-09-30 Git確定地点（本番未反映）
+
+- ユーザー承認：reservationは`release/phone-cancel-v2`へcommit/pushし、mainは`7badf4f828dd06d5fbd26e59c92facea4a7519f8`を維持。reservation-gasはmainへcommit/push。本番反映は別途承認後。
+- reservationのPages設定は「Deploy from a branch / main / (root)」。準備ブランチをpushしても公開元は変わらない。GAS更新前にreservationをmainへpushしない。
+- 確定するソース：frontend 56件・backend 90件、合計146件のローカル自動テスト。commitしたHEADを再テストし、同じ件数の成功、clean、リモート一致を確認する。確定SHAはgit log/git rev-parseで取得でき、作業チャットのrelease-git-checkpoint.jsonにも記録する。
+- 現在の本番GAS：Version 15。既存deployment ID=`AKfycbyRZPtspRr7fT793KBVko2xt9sNoFalCFOsU0yX_tADdr75NyUDTk4rBqDXlwcLjEFIyQ`。URL=`https://script.google.com/macros/s/AKfycbyRZPtspRr7fT793KBVko2xt9sNoFalCFOsU0yX_tADdr75NyUDTk4rBqDXlwcLjEFIyQ/exec`。
+- 現在公開中フロント：`7badf4f828dd06d5fbd26e59c92facea4a7519f8`。前回監査でPages成功実行36672447165と公開HTML完全一致を確認。Git確定後も公開版が維持されることを読み取り確認する。
+- GitHubのGAS mainへのpushはソース保管。自動deployment用.githubワークフローはなく、今回はclasp push/Version作成/deployment更新を行わない。deployment @15の維持をGit確定後に読み取り確認する。
+- 次工程：L/M未使用再確認→L1「電話番号」・M1「キャンセルトークンSHA-256」・L2:M1000プレーンテキスト→claspソース反映→新Version作成→既存deployment更新（URL/権限維持）→GET・旧POST互換・キャンセルAPI確認→reservation準備ブランチをmainへ反映→Pages確認→新予約/A〜M保存/Preview/電話照合取消/G更新/枠解放/再予約・競合拒否確認→テスト予約の有効枠を残さず整理→本番Version・SHA・検証結果を両CHECKPOINTへ記録。
+- テスト予約の整理は取消ステータスで履歴を残すことを基本とし、物理削除は別途承認なしに行わない。電話番号・平文トークンをGitや検証報告に記録しない。
+- 通常SSHはシステム設定の権限エラーがある。今回のGit操作だけ既存WORKFLOWの`GIT_SSH_COMMAND='ssh -F /dev/null -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes'`を使う。SSH設定ファイルは変更しない。

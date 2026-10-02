@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>ご予約 | pepel moco</title>
@@ -84,6 +85,7 @@
 
     <header><h1>pepel moco</h1><p>RESERVATION / ご予約</p></header>
 
+    <div id="bookingForm">
     <div id="notice" class="notice" role="status" aria-live="polite"></div>
 
 
@@ -132,17 +134,39 @@
     <section class="panel" id="customerPanel" aria-labelledby="customerHeading" hidden>
         <h2 id="customerHeading" tabindex="-1">お客様情報</h2>
         <label for="name">お名前（フルネーム）</label>
-        <input type="text" id="name" autocomplete="name" placeholder="山田 太郎">
+        <input type="text" id="name" autocomplete="name" placeholder="山田 太郎" required>
+        <label for="phone">電話番号（必須）</label>
+        <input type="tel" id="phone" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="090-1234-5678" aria-describedby="phoneHint" required>
+        <p id="phoneHint" class="hint">国内の電話番号を入力してください。ハイフンあり・なし、どちらでも入力できます。</p>
         <div class="actions"><button id="backDate" type="button">日時へ戻る</button><button class="btn" id="reviewBtn" type="button" disabled>予約内容を確認する</button></div>
     </section>
     <section class="panel" id="reviewPanel" aria-labelledby="reviewHeading" hidden>
         <h2 id="reviewHeading" tabindex="-1">予約内容の確認</h2>
         <dl class="review" id="reviewDetails"></dl>
         <p class="hint">内容をご確認のうえ、予約を確定してください。料金はメニュー掲載時の表記です。</p>
-        <div class="actions"><button id="backCustomer" type="button">お名前を修正</button><button class="btn" id="submitBtn" type="button" disabled>予約を確定する</button></div>
+        <div class="actions"><button id="backCustomer" type="button">お客様情報を修正</button><button class="btn" id="submitBtn" type="button" disabled>予約を確定する</button></div>
     </section>
     <div class="loading" id="loadingMsg" role="status">予約を送信中...</div>
 
+    </div>
+    <section id="completedPanel" class="panel" aria-labelledby="completedHeading" hidden>
+        <h2 id="completedHeading" tabindex="-1">ご予約を承りました。</h2>
+        <dl id="completedDetails" class="review"></dl>
+        <a id="cancelLink" hidden>予約をキャンセルする</a>
+        <p id="cancelLinkHint" class="hint" hidden>キャンセルが必要な場合に備え、このリンクを保存してください。リンクは他の人に共有しないでください。</p>
+        <p>予約手続きは完了しました。この画面は閉じていただいて大丈夫です。</p>
+    </section>
+    <section id="cancelPanel" class="panel" aria-labelledby="cancelHeading" hidden>
+        <h2 id="cancelHeading" tabindex="-1">予約のキャンセル</h2>
+        <dl id="cancelDetails" class="review"></dl>
+        <p id="cancelNotice" role="status" aria-live="polite"></p>
+        <div id="cancelControls" hidden>
+            <label for="cancelPhone">予約時の電話番号</label>
+            <input id="cancelPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" required>
+            <p class="hint">対象の予約内容をご確認ください。「キャンセルする」を押すと予約が取り消されます。</p>
+            <button id="cancelSubmit" class="btn" type="button" disabled>キャンセルする</button>
+        </div>
+    </section>
 </div>
 
 
@@ -161,6 +185,7 @@ const dateInput = document.getElementById('date');
 const menuSelect = document.getElementById('menu');
 const timeSelect = document.getElementById('time');
 const nameInput = document.getElementById('name');
+const phoneInput = document.getElementById('phone');
 const submitBtn = document.getElementById('submitBtn');
 const loadingMsg = document.getElementById('loadingMsg');
 const notice = document.getElementById('notice');
@@ -170,6 +195,7 @@ let checkedKey = null;
 let requestId = 0;
 let availabilityController = null;
 let submitting = false;
+let completed = false;
 
 // サロンの日本時間で日付の下限を設定（端末のタイムゾーンには依存しない）。
 const todayParts = new Intl.DateTimeFormat('en-US', {
@@ -218,16 +244,24 @@ function menuQuery(key) {
 function responseMenuKey(data) {
     return Array.isArray(data.menuIds) ? (data.menuIds.length === 1 ? data.menuIds[0] : JSON.stringify(data.menuIds)) : data.menuId;
 }
+function normalizedPhone(value) {
+    if (typeof value !== 'string' || value.length > 40) return '';
+    const text = value.trim().replace(/[０-９]/g, digit => String(digit.charCodeAt(0) - 0xFF10))
+        .replace(/[‐‑‒–—―−ー－]/g, '-').replace(/\s/g, '');
+    if (!/^[0-9]+(?:-[0-9]+)*$/.test(text)) return '';
+    const digits = text.replace(/-/g, '');
+    return /^0[0-9]{9,10}$/.test(digits) && !/^0+$/.test(digits) ? digits : '';
+}
 function bookingReady() {
-    return !submitting && !!selectedMenu() && checkedKey === selectionKey() &&
+    return !completed && !submitting && !!selectedMenu() && checkedKey === selectionKey() &&
         !timeSelect.disabled && availableTimes.includes(timeSelect.value);
 }
-function reviewKey() { return [selectionKey(), timeSelect.value, nameInput.value.trim()].join('|'); }
+function reviewKey() { return [selectionKey(), timeSelect.value, nameInput.value.trim(), normalizedPhone(phoneInput.value)].join('|'); }
 function showStep(step, focus = true) {
-    if (submitting) return;
+    if (submitting || completed) return;
     if (step !== 'menu' && !selectedMenu()) return;
     if ((step === 'customer' || step === 'review') && !bookingReady()) return;
-    if (step === 'review' && !nameInput.value.trim()) return;
+    if (step === 'review' && (!nameInput.value.trim() || !normalizedPhone(phoneInput.value))) return;
     flowStep = step;
     if (step !== 'review') reviewedSelection = null;
     renderFlow();
@@ -242,6 +276,13 @@ function showStep(step, focus = true) {
     }
 }
 function renderFlow() {
+    document.getElementById('bookingForm').hidden = completed;
+    document.getElementById('completedPanel').hidden = !completed || !!cancelCredentials;
+    if (completed) {
+        flowSteps.forEach(step => { document.getElementById(step + 'Panel').hidden = true; });
+        submitBtn.disabled = true;
+        return;
+    }
     const menu = selectedMenu();
     flowSteps.forEach(step => { document.getElementById(step + 'Panel').hidden = flowStep !== step; });
     document.getElementById('flowProgress').textContent = (flowSteps.indexOf(flowStep) + 1) + ' / 4　' +
@@ -253,7 +294,7 @@ function renderFlow() {
     document.getElementById('timeContext').textContent = dateInput.value ? dateInput.value + ' の予約可能時間' : '';
     document.getElementById('toDate').disabled = submitting || menuSelect.disabled || !menu;
     document.getElementById('toCustomer').disabled = !bookingReady();
-    document.getElementById('reviewBtn').disabled = !bookingReady() || !nameInput.value.trim();
+    document.getElementById('reviewBtn').disabled = !bookingReady() || !nameInput.value.trim() || !normalizedPhone(phoneInput.value);
     ['editMenu','editDate','backDate','backCustomer'].forEach(id => { document.getElementById(id).disabled = submitting; });
 }
 function renderMenuCards() {
@@ -281,7 +322,7 @@ function renderMenuCards() {
 let combinationOption = null;
 function selectMenu(id, toggle = false) {
     const menu = menus.find(item => item.id === id && item.webBookingEnabled && item.bookable);
-    if (submitting || menuSelect.disabled || !menu) return;
+    if (completed || submitting || menuSelect.disabled || !menu) return;
     const current = selectedMenuIds();
     const ids = toggle ? (current.includes(id) ? current.filter(value => value !== id) : [...current,id]) : [id];
     const key = ids.length > 1 ? JSON.stringify(ids) : ids[0] || '';
@@ -305,11 +346,11 @@ function selectMenu(id, toggle = false) {
     if (flowStep === 'date') loadWeek();
 }
 function openReview() {
-    if (!bookingReady() || !nameInput.value.trim()) return;
+    if (!bookingReady() || !nameInput.value.trim() || !normalizedPhone(phoneInput.value)) return;
     const menu = selectedMenu();
     reviewDetails.replaceChildren();
     [['メニュー',menu.name],['料金',menu.price],['所要時間',menu.durationMinutes + '分'],
-        ['ご予約日時',dateInput.value + '　' + timeSelect.value],['お名前',nameInput.value.trim()]].forEach(([label,value]) => {
+        ['ご予約日時',dateInput.value + '　' + timeSelect.value],['お名前',nameInput.value.trim()],['電話番号',normalizedPhone(phoneInput.value)]].forEach(([label,value]) => {
         const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
         dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); reviewDetails.appendChild(row);
     });
@@ -408,7 +449,7 @@ function renderWeek() {
 }
 let weekLoadingKey = null;
 async function loadWeek(retryFailed = false) {
-    if (!selectedMenu() || submitting) return;
+    if (completed || !selectedMenu() || submitting) return;
     const menuId = menuSelect.value;
     const key = menuId + '|' + weekStart;
     if (weekLoadingKey === key) return;
@@ -463,7 +504,7 @@ async function loadWeek(retryFailed = false) {
     }
 }
 function moveWeek(delta) {
-    if (submitting) return;
+    if (submitting || completed) return;
     const next = addDays(weekStart,delta*7);
     weekStart = next < dateInput.min ? dateInput.min : next;
     resetTimes('日時を選択してください');
@@ -556,9 +597,9 @@ function selectionKey() {
 }
 
 function updateSubmit() {
-    submitBtn.disabled = submitting || checkedKey !== selectionKey() ||
+    submitBtn.disabled = completed || submitting || checkedKey !== selectionKey() ||
         timeSelect.disabled || !availableTimes.includes(timeSelect.value) ||
-        !nameInput.value.trim();
+        !nameInput.value.trim() || !normalizedPhone(phoneInput.value);
     renderFlow();
 }
 
@@ -575,6 +616,7 @@ async function requestJSON(url, options = {}) {
 }
 
 async function loadMenus() {
+    if (completed) return;
     requestId++;
     if (availabilityController) availabilityController.abort();
     resetTimes('日付とメニューを選択してください');
@@ -618,6 +660,7 @@ async function loadMenus() {
 }
 
 async function loadAvailability() {
+    if (completed) return;
     renderCalendar();
     const currentRequest = ++requestId;
     if (availabilityController) availabilityController.abort();
@@ -674,14 +717,15 @@ async function submitReservation() {
     updateSubmit();
     if (submitBtn.disabled || flowStep !== 'review' || reviewedSelection !== reviewKey()) return;
     const ids = selectedMenuIds();
-    const payload = { sourceType: 'WEB_PAGE', ...(ids.length === 1 ? {menuId:ids[0]} : {menuIds:ids}),
-        date: dateInput.value, time: timeSelect.value, name: nameInput.value.trim() };
+    const payload = { sourceType: 'WEB_PAGE', requestVersion: 2, ...(ids.length === 1 ? {menuId:ids[0]} : {menuIds:ids}),
+        date: dateInput.value, time: timeSelect.value, name: nameInput.value.trim(), phone: normalizedPhone(phoneInput.value) };
+    const bookedMenuName = selectedMenu().name;
     submitting = true;
     invalidateWeek();
     requestId++;
     if (availabilityController) availabilityController.abort();
     resetTimes('予約を送信中...');
-    [menuSelect, dateInput, nameInput].forEach(element => element.disabled = true);
+    [menuSelect, dateInput, nameInput, phoneInput].forEach(element => element.disabled = true);
     renderCalendar(); renderMenuCards(); renderFlow();
     loadingMsg.style.display = 'block';
     showNotice('');
@@ -694,8 +738,22 @@ async function submitReservation() {
         const data = await requestJSON(GAS_WEB_APP_URL, {
             method: 'POST', body: JSON.stringify(payload), signal: controller.signal
         });
-        nameInput.value = '';
-        message = '予約が確定しました。予約ID：' + data.reservationId;
+        const link = document.getElementById('cancelLink');
+        if (data.canCancel === true && typeof data.cancelToken === 'string' && /^[a-f0-9]{64}$/.test(data.cancelToken)) {
+            link.href = '#cancel=' + encodeURIComponent(data.reservationId) + '&token=' + data.cancelToken;
+            link.hidden = false;
+            document.getElementById('cancelLinkHint').hidden = false;
+        }
+        completed = true;
+        const details = document.getElementById('completedDetails');
+        details.replaceChildren();
+        [['予約ID',data.reservationId],['予約したメニュー',bookedMenuName],
+            ['予約日時',payload.date + '　' + payload.time]].forEach(([label,value]) => {
+            const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+            dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); details.appendChild(row);
+        });
+        renderFlow();
+        document.getElementById('completedHeading').focus();
     } catch (error) {
         refreshMenus = error.status === 'menu_not_bookable' || error.status === 'configuration_error';
         message = error.status ? error.message :
@@ -703,14 +761,16 @@ async function submitReservation() {
     } finally {
         clearTimeout(timer);
         submitting = false;
-        [menuSelect, dateInput, nameInput].forEach(element => element.disabled = false);
         loadingMsg.style.display = 'none';
-        flowStep = refreshMenus ? 'menu' : 'date';
-        renderMenuCards();
-        if (refreshMenus) await loadMenus();
-        else { await loadAvailability(); loadWeek(); }
-        showNotice(message);
-        renderFlow();
+        if (!completed) {
+            [menuSelect, dateInput, nameInput, phoneInput].forEach(element => element.disabled = false);
+            flowStep = refreshMenus ? 'menu' : 'date';
+            renderMenuCards();
+            if (refreshMenus) await loadMenus();
+            else { await loadAvailability(); loadWeek(); }
+            showNotice(message);
+            renderFlow();
+        }
     }
 }
 
@@ -724,10 +784,94 @@ dateInput.addEventListener('change', loadAvailability);
 menuSelect.addEventListener('change', () => selectMenu(menuSelect.value));
 timeSelect.addEventListener('change', updateSubmit);
 nameInput.addEventListener('input', updateSubmit);
+phoneInput.addEventListener('input', updateSubmit);
 submitBtn.addEventListener('click', submitReservation);
-resetTimes('日付とメニューを選択してください');
-renderCalendar();
-loadMenus();
+// フラグメントはWebサーバーに送信されない。読取後はアドレス欄から資格を除去。
+let cancelCredentials = null;
+let cancelBusy = false;
+let cancelReady = false;
+let cancelFinished = false;
+let cancelVersion = 0;
+function updateCancelButton() {
+    document.getElementById('cancelSubmit').disabled = cancelBusy || !cancelReady || cancelFinished ||
+        !normalizedPhone(document.getElementById('cancelPhone').value);
+}
+async function cancelRequest(action, extra = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+        return await requestJSON(GAS_WEB_APP_URL, {method:'POST', signal:controller.signal,
+            body:JSON.stringify({sourceType:'WEB_PAGE', action, ...cancelCredentials, ...extra})});
+    } finally { clearTimeout(timer); }
+}
+async function openCancellation() {
+    const params = new URLSearchParams(location.hash.slice(1));
+    if (!params.has('cancel')) return false;
+    const version = ++cancelVersion;
+    cancelCredentials = {reservationId:params.get('cancel'),cancelToken:params.get('token')};
+    history.replaceState(null, '', location.pathname + location.search + '#cancel');
+    completed = true;
+    requestId++; invalidateWeek();
+    if (availabilityController) availabilityController.abort();
+    document.getElementById('bookingForm').hidden = true;
+    document.getElementById('completedPanel').hidden = true;
+    document.getElementById('cancelPanel').hidden = false;
+    cancelReady = false; cancelFinished = false; cancelBusy = true;
+    document.getElementById('cancelControls').hidden = true;
+    document.getElementById('cancelPhone').value = '';
+    document.getElementById('cancelPhone').disabled = false;
+    document.getElementById('cancelDetails').replaceChildren();
+    const message = document.getElementById('cancelNotice');
+    message.textContent = '予約内容を確認中...';
+    updateCancelButton();
+    try {
+        if (!cancelCredentials.reservationId || !/^[a-f0-9]{64}$/.test(cancelCredentials.cancelToken || '')) throw new Error();
+        // 読み取り専用POST。電話番号・トークンをAPIのURLに載せない。
+        const data = await cancelRequest('cancelPreview');
+        if (version !== cancelVersion) return true;
+        [['予約日時',data.date + '　' + data.time],['メニュー',data.menu]].forEach(([label,value]) => {
+            const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+            dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd);
+            document.getElementById('cancelDetails').appendChild(row);
+        });
+        cancelReady = !data.cancelled;
+        message.textContent = data.cancelled ? 'この予約はキャンセル済みです。' : 'キャンセルするには、予約時の電話番号を入力してください。';
+        document.getElementById('cancelControls').hidden = !cancelReady;
+    } catch (_) {
+        if (version === cancelVersion) message.textContent = '予約を確認できません。保存したリンクから開き直すか店舗へお問い合わせください。';
+    } finally {
+        if (version === cancelVersion) { cancelBusy = false; updateCancelButton(); document.getElementById('cancelHeading').focus(); }
+    }
+    return true;
+}
+async function submitCancellation() {
+    updateCancelButton();
+    if (document.getElementById('cancelSubmit').disabled) return;
+    const version = cancelVersion;
+    cancelBusy = true; updateCancelButton();
+    document.getElementById('cancelPhone').disabled = true;
+    const message = document.getElementById('cancelNotice');
+    message.textContent = 'キャンセル処理中...';
+    try {
+        await cancelRequest('cancelReservation', {phone:normalizedPhone(document.getElementById('cancelPhone').value)});
+        if (version !== cancelVersion) return;
+        cancelFinished = true;
+        document.getElementById('cancelControls').hidden = true;
+        document.getElementById('cancelPhone').value = '';
+        message.textContent = '予約をキャンセルしました。この画面は閉じていただいて大丈夫です。';
+    } catch (error) {
+        if (version !== cancelVersion) return;
+        message.textContent = error.status ? 'キャンセルできません。電話番号を確認するか店舗へお問い合わせください。' :
+            'キャンセル結果を確認できませんでした。店舗へ確認するか保存したリンクから状態を確認してください。';
+    } finally {
+        if (version === cancelVersion) { cancelBusy = false; document.getElementById('cancelPhone').disabled = false; updateCancelButton(); }
+    }
+}
+document.getElementById('cancelPhone').addEventListener('input', updateCancelButton);
+document.getElementById('cancelSubmit').addEventListener('click', submitCancellation);
+window.addEventListener('hashchange', openCancellation);
+if (new URLSearchParams(location.hash.slice(1)).has('cancel')) openCancellation();
+else { resetTimes('日付とメニューを選択してください'); renderCalendar(); loadMenus(); }
 
 </script>
 
