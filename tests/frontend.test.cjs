@@ -235,3 +235,62 @@ test('late cancel response cannot mark a different target cancelled',async()=>{
  s.run("location.hash='#cancel=WEB-NEW&token="+'b'.repeat(64)+"';openCancellation()");s.requests.shift().resolve({status:'success',date:'2099-01-07',time:'11:00',menu:'新しい対象',cancelled:false});await new Promise(setImmediate);
  old.resolve({status:'success'});await p;assert.doesNotMatch(s.els.cancelNotice.textContent,/予約をキャンセルしました/);assert.equal(s.els.cancelControls.hidden,false);assert.equal(s.els.cancelPhone.disabled,false);
 });
+
+test('visible menu loading, deduplicated fetch and master cards after completion',async()=>{
+ const s=setup();assert.equal(s.els.menuLoading.hidden,false);assert.equal(s.els.menuCards.attributes['aria-busy'],'true');
+ await s.run('loadMenus()');assert.equal(s.requests.length,1);await ready(s);
+ assert.equal(s.els.menuLoading.hidden,true);assert.equal(s.els.menuCards.attributes['aria-busy'],'false');
+ assert.equal(s.els.menuCards.children[0].children[1].children[0].textContent,menu.name);
+ assert.match(html,/メニューを読み込んでいます/);
+});
+test('failed menus offer explicit retry without blank loading or duplicate requests',async()=>{
+ const s=setup();s.requests.shift().reject(new Error('offline'));await new Promise(setImmediate);
+ assert.equal(s.els.menuLoading.hidden,true);assert.equal(s.els.retryMenus.hidden,false);assert.equal(s.els.toDate.disabled,true);
+ const p=s.els.retryMenus.events.click();assert.equal(s.els.menuLoading.hidden,false);assert.equal(s.els.retryMenus.hidden,true);
+ await s.run('loadMenus()');assert.equal(s.requests.length,1);await ready(s);await p;assert.equal(s.els.menu.disabled,false);
+});
+test('circle highlights synchronously, blocks repeated and other taps until revalidation',async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
+ const old=s.els.schedule.children[1].children[1].children[1].children[0];const p=old.events.click();
+ const selected=s.els.schedule.children[1].children[1].children[1].children[0];
+ assert.equal(selected.attributes['aria-pressed'],'true');assert.equal(selected.disabled,true);
+ assert.match(s.els.selectionStatus.textContent,/選択中.*再確認中/);assert.equal(s.els.toCustomer.disabled,true);
+ await old.events.click();await s.els.schedule.children[1].children[1].children[2].children[0].events.click();
+ assert.equal(s.requests.length,1);s.run("showStep('customer')");assert.equal(s.els.customerPanel.hidden,true);
+ const req=s.requests.shift(),date=new URL(req.url).searchParams.get('date');req.resolve(response(date));await p;
+ assert.equal(s.els.toCustomer.disabled,false);assert.equal(s.els.schedule.children[1].children[1].children[1].children[0].attributes['aria-pressed'],'true');
+ assert.doesNotMatch(s.els.selectionStatus.textContent,/再確認中/);
+});
+test('failed circle recheck clears pending highlight and allows retry while keeping next disabled',async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
+ const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click();s.requests.shift().reject(new Error('offline'));await p;
+ const button=s.els.schedule.children[1].children[1].children[1].children[0];
+ assert.equal(button.disabled,false);assert.equal(button.attributes['aria-pressed'],'false');assert.equal(s.els.toCustomer.disabled,true);
+ assert.match(s.els.selectionStatus.textContent,/別の◎/);
+});
+test('week change during circle recheck never restores an old selection',async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
+ const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click(),old=s.requests.shift();
+ s.run('moveWeek(1)');const req=s.requests.shift();req.resolve(weekResponse(req));await new Promise(setImmediate);
+ old.resolve(response(new URL(old.url).searchParams.get('date')));await p;
+ assert.equal(s.els.time.value,'');assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.run('pendingSlot'),null);
+});
+test('four step indicators follow menu, date, customer, review and back navigation',async()=>{
+ const s=setup();await ready(s);s.run("selectMenu('m1');showStep('menu')");assert.equal(s.els['step-menu'].attributes['aria-current'],'step');
+ s.els.toDate.events.click();assert.equal(s.els['step-date'].attributes['aria-current'],'step');await readyWeek();
+ const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click(),req=s.requests.shift();req.resolve(response(new URL(req.url).searchParams.get('date')));await p;
+ s.els.toCustomer.events.click();assert.equal(s.els['step-customer'].attributes['aria-current'],'step');
+ s.els.name.value='テスト';s.els.phone.value='03-1234-5678';s.els.phone.events.input();s.els.reviewBtn.events.click();
+ assert.equal(s.els['step-review'].attributes['aria-current'],'step');assert.equal(s.els['step-customer'].attributes['aria-current'],'false');
+ assert.equal(s.els.reviewDetails.children[5].children[1].textContent,'0312345678');
+ s.els.backCustomer.events.click();assert.equal(s.els['step-customer'].attributes['aria-current'],'step');
+ async function readyWeek(){const req=s.requests.shift();req.resolve(weekResponse(req));await new Promise(setImmediate);}
+});
+
+test('tapping already validated selected circle keeps selection without redundant daily GET',async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
+ const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click(),req=s.requests.shift();
+ req.resolve(response(new URL(req.url).searchParams.get('date')));await p;
+ await s.els.schedule.children[1].children[1].children[1].children[0].events.click();
+ assert.equal(s.requests.length,0);assert.equal(s.els.time.value,'10:40');assert.equal(s.els.toCustomer.disabled,false);
+});

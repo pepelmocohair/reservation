@@ -76,6 +76,51 @@
         .schedule button:focus-visible { outline-offset:-4px; }
         .week-nav { display:flex; justify-content:space-between; align-items:center; gap:8px; }
         .week-nav button { padding:0 12px; }
+        /* Mobile-first booking: compact context and persistent next action. */
+        header { padding:4px 0 16px; }
+        header p { margin:2px 0 0; }
+        .steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; list-style:none; padding:0; margin:0 0 16px; font-size:12px; }
+        .steps li { text-align:center; padding:8px 2px; border-bottom:3px solid #dedbd4; color:#666; }
+        .steps li[aria-current="step"] { color:#234f43; border-color:#234f43; font-weight:700; background:#eaf2ee; }
+        .progress { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); }
+        .menu-loading { padding:20px 14px; background:#fff; border:1px solid #dedbd4; border-radius:6px; }
+        .menu-loading p { margin:0; }
+        .menu-placeholder { height:56px; margin-top:12px; border-radius:4px; background:linear-gradient(90deg,#f0eee7,#f8f7f4,#f0eee7); }
+        .menu-card { padding:12px 14px; margin:8px 0; border-radius:6px; }
+        .menu-card .card-meta { margin-top:2px; }
+        .category-title { margin:16px 0 6px; }
+        .summary { padding:10px 0; margin-bottom:12px; gap:8px; font-size:14px; }
+        .summary button { font-size:12px; padding:0 8px; }
+        .btn { background:#234f43; border-color:#234f43; font-weight:600; }
+        .menu-card[aria-pressed="true"] { border-color:#234f43; background:#eaf2ee; }
+        .schedule button[aria-pressed="true"] { background:#234f43; color:#fff; box-shadow:inset 0 0 0 3px #17372e; }
+        .schedule button:disabled { color:#49665b; }
+        .schedule button[aria-pressed="true"]:disabled { color:#fff; }
+        .schedule-scroll { overscroll-behavior:contain; }
+        .menu-dock .hint { max-height:54px; overflow:auto; }
+        #menuPanel { margin-bottom:150px; }
+        @media(max-width:360px) { .steps { font-size:10px; } }
+        @media(max-width:767px) {
+            body { padding:12px 10px; }
+            h1 { font-size:22px; }
+            header { padding:0 0 12px; }
+            header p { font-size:10px; }
+            .panel { padding:14px 0; border:0; border-radius:0; background:transparent; margin-bottom:130px; }
+            .panel h2 { margin-bottom:8px; }
+            #datePanel .form-group { margin-bottom:12px; }
+            .hint { margin:8px 0; font-size:12px; }
+            .schedule-scroll { margin:12px -10px; max-height:58vh; }
+            .schedule { min-width:360px; }
+            .schedule th:first-child { width:44px; }
+            .week-nav button { padding:0 8px; font-size:12px; }
+            .week-nav span { font-size:13px; white-space:nowrap; }
+            .actions, .date-dock { position:fixed; z-index:30; left:0; right:0; bottom:0; margin:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid #dedbd4; background:#f7f6f2; }
+            .actions { gap:8px; }
+            .actions button { padding:10px; font-size:13px; }
+            .date-dock .hint { margin:0 0 6px; }
+            #customerPanel label { margin:14px 0 6px; }
+            .review div { padding:10px 0; }
+        }
     </style>
 </head>
 
@@ -90,15 +135,18 @@
 
 
     <p class="progress" id="flowProgress" role="status">1 / 4　メニュー</p>
+    <ol id="flowSteps" class="steps" aria-label="予約の手順"><li id="step-menu" aria-current="step">1 メニュー</li><li id="step-date">2 日時</li><li id="step-customer">3 お客様情報</li><li id="step-review">4 確認</li></ol>
     <div id="menuSummary" class="summary" hidden><p id="menuSummaryText"></p><button id="editMenu" type="button">メニュー変更</button></div>
     <div id="dateSummary" class="summary" hidden><p id="dateSummaryText"></p><button id="editDate" type="button">日時変更</button></div>
     <div id="menuPanel">
         <p id="menuHeading" class="hint" tabindex="-1">ご希望のメニューを選択してください（複数選択可）。もう一度押すと解除できます。</p>
         <select id="menu" hidden disabled aria-label="メニュー"><option value="">メニューを読み込み中...</option></select>
+        <div id="menuLoading" class="menu-loading" role="status"><p>メニューを読み込んでいます</p><div class="menu-placeholder" aria-hidden="true"></div><div class="menu-placeholder" aria-hidden="true"></div></div>
+        <button id="retryMenus" type="button" hidden>メニューを再取得</button>
         <div id="menuCards" role="group" aria-labelledby="menuHeading"></div>
         <div class="menu-dock" id="menuDock"><div class="menu-dock-inner">
         <p id="menuDetails" class="hint" aria-live="polite">メニューを読み込み中...</p>
-        <button class="btn" id="toDate" type="button" disabled>日付を選ぶ</button>
+        <button class="btn" id="toDate" type="button" disabled>日時を選ぶ</button>
         </div></div>
     </div>
     <section class="panel" id="datePanel" aria-labelledby="dateLabel" hidden>
@@ -129,7 +177,7 @@
         <div class="schedule-scroll" tabindex="0" role="region" aria-label="7日間の予約可能時間"><table id="schedule" class="schedule" aria-label="予約可能時間一覧"></table></div>
     </div>
 
-        <button class="btn" id="toCustomer" type="button" disabled>お客様情報へ</button>
+        <div class="date-dock"><p id="selectionStatus" class="hint" role="status" aria-live="polite">◎から日時を選択してください</p><button class="btn" id="toCustomer" type="button" disabled>お客様情報へ</button></div>
     </section>
     <section class="panel" id="customerPanel" aria-labelledby="customerHeading" hidden>
         <h2 id="customerHeading" tabindex="-1">お客様情報</h2>
@@ -196,6 +244,8 @@ let requestId = 0;
 let availabilityController = null;
 let submitting = false;
 let completed = false;
+let menusLoading = false;
+let pendingSlot = null;
 
 // サロンの日本時間で日付の下限を設定（端末のタイムゾーンには依存しない）。
 const todayParts = new Intl.DateTimeFormat('en-US', {
@@ -284,6 +334,7 @@ function renderFlow() {
         return;
     }
     const menu = selectedMenu();
+    flowSteps.forEach(step => document.getElementById('step-' + step).setAttribute('aria-current', flowStep === step ? 'step' : 'false'));
     flowSteps.forEach(step => { document.getElementById(step + 'Panel').hidden = flowStep !== step; });
     document.getElementById('flowProgress').textContent = (flowSteps.indexOf(flowStep) + 1) + ' / 4　' +
         ({menu:'メニュー',date:'日付・時間',customer:'お客様情報',review:'予約内容確認'})[flowStep];
@@ -375,6 +426,7 @@ function addDays(date, days) {
     return value.toISOString().slice(0,10);
 }
 function invalidateWeek() {
+    pendingSlot = null;
     weekLoadingKey = null;
     weekVersion++;
     if (weekController) weekController.abort();
@@ -388,6 +440,7 @@ function validAvailability(data, date, menuId) {
 }
 function renderWeek() {
     const table = document.getElementById('schedule'); table.replaceChildren();
+    table.setAttribute('aria-busy', String(!!pendingSlot || !!weekLoadingKey));
     const head = document.createElement('thead'), header = document.createElement('tr');
     const corner = document.createElement('th'); corner.textContent = '時刻'; header.appendChild(corner);
     weekDays.forEach(day => {
@@ -419,17 +472,27 @@ function renderWeek() {
             const canBook = day.data && !day.data.isClosed && day.data.availableStartTimes.includes(time);
             if (canBook) {
                 const button = document.createElement('button'); button.type = 'button'; button.textContent = '◎';
-                button.disabled = submitting || weekMenuId !== menuSelect.value;
+                button.disabled = submitting || !!pendingSlot || weekMenuId !== menuSelect.value;
                 button.setAttribute('aria-label', day.date + ' ' + time + ' 予約可能');
-                button.setAttribute('aria-pressed', String(dateInput.value === day.date && timeSelect.value === time));
+                button.setAttribute('aria-pressed', String(pendingSlot ? pendingSlot.date === day.date && pendingSlot.time === time : dateInput.value === day.date && timeSelect.value === time));
                 const version = weekVersion;
                 button.addEventListener('click', async () => {
-                    if (submitting || version !== weekVersion || weekMenuId !== menuSelect.value) return;
+                    if (submitting || completed || pendingSlot || version !== weekVersion || weekMenuId !== menuSelect.value) return;
+                    if (bookingReady() && dateInput.value === day.date && timeSelect.value === time) return;
                     dateInput.value = day.date;
                     calendarMonth = day.date.slice(0,7);
+                    const slot = {date:day.date, time};
+                    pendingSlot = slot;
                     const pending = loadAvailability();
+                    document.getElementById('selectionStatus').textContent = '選択中：' + day.date + ' ' + time + '（空き状況を再確認中…）';
+                    renderWeek();
                     const selectionRequest = requestId;
                     await pending;
+                    if (pendingSlot !== slot) return;
+                    pendingSlot = null;
+                    renderWeek();
+                    document.getElementById('selectionStatus').textContent = checkedKey === selectionKey() && availableTimes.includes(time) ?
+                        '選択中：' + day.date + ' ' + time : 'この日時を選択できません。別の◎を選んでください。';
                     if (selectionRequest !== requestId || version !== weekVersion || dateInput.value !== day.date || checkedKey !== selectionKey() || !availableTimes.includes(time)) return;
                     timeSelect.value = time;
                     timeStatus.textContent = '選択中：' + day.date + ' ' + time;
@@ -498,7 +561,7 @@ async function loadWeek(retryFailed = false) {
             const failed = weekDays.some(day=>day.error);
             document.getElementById('weekStatus').textContent = failed ? '取得できない日があります。再取得してください。' :
                 weekDays.some(day=>day.data && !day.data.isClosed && day.data.availableStartTimes.length) ?
-                '◎を選ぶと、その日時の空き状況を再確認します。' : 'この7日間は予約できる時間がありません。';
+                '◎をタップして日時を選択してください。' : 'この7日間は予約できる時間がありません。';
             document.getElementById('retryWeek').hidden = !failed;
         }
     }
@@ -582,6 +645,7 @@ function showNotice(message) {
 
 function resetTimes(message) {
     reviewedSelection = null;
+    document.getElementById('selectionStatus').textContent = '◎から日時を選択してください';
     timeButtons.replaceChildren();
     timeStatus.textContent = message;
     availableTimes = [];
@@ -616,7 +680,11 @@ async function requestJSON(url, options = {}) {
 }
 
 async function loadMenus() {
-    if (completed) return;
+    if (completed || menusLoading) return;
+    menusLoading = true;
+    document.getElementById('menuLoading').hidden = false;
+    document.getElementById('retryMenus').hidden = true;
+    menuCards.setAttribute('aria-busy', 'true');
     requestId++;
     if (availabilityController) availabilityController.abort();
     resetTimes('日付とメニューを選択してください');
@@ -655,8 +723,9 @@ async function loadMenus() {
         showNotice(menuSelect.disabled ? '現在WEB予約できるメニューがありません。' : '');
     } catch (error) {
         menuSelect.replaceChildren(new Option('メニューを取得できませんでした', ''));
-        showNotice('メニューを取得できませんでした。ページを再読み込みしてください。');
-    } finally { clearTimeout(timer); renderCalendar(); renderMenuCards(); renderFlow(); }
+        showNotice('メニューを取得できませんでした。再取得ボタンを押してください。');
+        document.getElementById('retryMenus').hidden = false;
+    } finally { clearTimeout(timer); menusLoading = false; document.getElementById('menuLoading').hidden = true; menuCards.setAttribute('aria-busy', 'false'); renderCalendar(); renderMenuCards(); renderFlow(); }
 }
 
 async function loadAvailability() {
@@ -773,6 +842,8 @@ async function submitReservation() {
         }
     }
 }
+
+document.getElementById('retryMenus').addEventListener('click', loadMenus);
 
 // input時点で古い時刻を無効化。changeで確定した条件を取得する。
 dateInput.addEventListener('input', () => {
