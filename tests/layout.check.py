@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix='calendar-layout-') as folder:
   data=json.loads(result.stdout)
   if width<768: assert data['policyPosition']['bottom']<=data['policyPosition']['actionsTop']
   assert data['customer']['unchecked'] and data['customer']['blocked'] and data['customer']['customerVisible']
-  assert data['customer']['textareaHeight']>=120 and data['customer']['textareaFont']=='16px' and data['customer']['checkboxHeight']>=48
+  assert 76<=data['customer']['textareaHeight']<=100 and data['customer']['textareaFont']=='16px' and data['customer']['checkboxHeight']>=48
   assert not data['customer']['overflow'] and data['customer']['notesRight']<=width
   assert data['review']['visible'] and data['review']['confirmEnabled'] and not data['review']['overflow']
   assert data['review']['requests']=='静かに過ごしたいです\nカラーの相談を希望します'

@@ -239,3 +239,12 @@ TZ=Asia/Tokyo node tests/backend.test.cjs
 - Chromeのローカル模擬APIで4幅（320×740/390×844/430×932/768×1024）の日時Loading前後8画面とStep3/4を検証し、既存日時レイアウト/30分/固定月〜日/土青日赤/再確認ボタンのassertをすべて維持。Step3の未チェック拒否・label48px・textarea16px・横溢れ無し、スクロール後にcheckboxが固定下部操作に隠れないこと、チェック後のStep4と改行付き内容の表示をassert。Step1のLoadingは320/390/430pxで文字20px/背景透明/枠0/子要素pのみをassert。画像を視覚確認（主に390px、320px）。生成画像は/tmp/customer-{幅}{-policy|-review}.png、/tmp/menu-loading-{幅}.png。実iOS/LINE内ブラウザ・キーボード・VoiceOverは実機確認が必要。
 - tests/local-preview.cjsとLOCAL_PREVIEW.mdを追加。準備GASをVMで実行し、Sheets/Lock等はローカルメモリで模擬。フロントAPIを同じローカルサーバー/apiへ置換し本番URLを除去、ヘッダーで確認用/非本番保存と明示。ローカルHTTPのsmokeで現行UI・要望予約POST・競合・電話照合取消・占有解放を確認PASS。サーバーは4173で起動し同じLANのスマホで実機確認可能（ネットワーク/端末側接続は未検証）。ダミー入力だけを使い、再起動で全テスト予約が消える。
 - mainへのmerge/push、本ブランチpush、GitHub Pages、本番GASへのclasp push/deploy、Spreadsheet列/見出し/行の変更、本番API通信は未実施。バックエンド元mainは変更なし。公開前にN未使用/列存在・見出しを確認しGAS→フロントの契約を検証する。今回のcommit SHAは本節を含むGit履歴を参照。未追跡references/は維持しcommit対象外。
+
+## 2026-10-02 任意メッセージ欄の簡素化・100文字上限（未公開）
+
+- Step3のラベルを「メッセージ・ご要望があればどうぞ（任意）」へ変更。旧ラベル/下部補助文/文字数カウンターのDOM・参照を撤去。textareaをrows=2、最小高さ80px、padding10pxに縮小（従来実測約141px→80px）。入力は任意で16px文字を維持。
+- フロントmaxlength/MAX_REQUESTS_LENGTHとバックエンドMAX_CUSTOMER_REQUESTS_LENGTHを100へ揃え、超過時のAPI文言も100文字へ変更。POST customerRequests・N列保存・確認画面の条件表示・ポリシー/電話/取消は維持。既存保存済みの長いメッセージは制限/切り詰めず、占有読取・キャンセルで変更しない。
+- frontend112/112、backend123/123、計235/235 PASS。上限テストを100文字成功/101文字拒否へ厳密に更新。新ラベル・2行・補助文/カウンター不存在、既存100文字超メッセージの読取/取消時保持を追加。両repo diff --check PASS。
+- 320/390/430/768pxで既存の日時・Step3/4・ポリシー・メニューLoadingのブラウザ検証をすべて実行しPASS。textareaが全幅で80px、横溢れなし、チェックは固定下部操作に隠れないことを確認。390pxの入力画面と320pxのポリシー画面を画像確認。日時画面のコード/レイアウトは変更なし。
+- LOCAL_PREVIEW.mdの上限説明を100文字へ更新。実機確認用ローカルプレビューを再起動して新しい画面/バックエンドへ更新。作業ブランチへのcommitだけで、本番公開・mainへのmerge・push・clasp反映・本番Spreadsheet変更なし。
+- 対応バックエンドcommit：4fdf85e59e9d17a8e03050b9a2063669b2ab9888（reservation-gas / ux/mobile-speed-v1）。

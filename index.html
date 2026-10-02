@@ -151,7 +151,7 @@
             #datePanel .date-dock { padding:6px 12px calc(6px + env(safe-area-inset-bottom)); }
             #datePanel .date-dock .btn { min-height:44px; padding:8px; }
         }
-        #customerPanel textarea { font:inherit; font-size:16px; width:100%; min-height:120px; padding:12px; border:1px solid #aaa; border-radius:4px; background:#fff; color:#222; resize:vertical; }
+        #customerPanel textarea { font:inherit; font-size:16px; width:100%; min-height:80px; padding:10px; border:1px solid #aaa; border-radius:4px; background:#fff; color:#222; resize:vertical; }
         .cancel-policy { margin-top:24px; }
         .cancel-policy h3 { font-size:16px; margin:0 0 8px; }
         .cancel-policy p { margin:0 0 12px; }
@@ -222,10 +222,8 @@
         <label for="phone">電話番号（必須）</label>
         <input type="tel" id="phone" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="090-1234-5678" aria-describedby="phoneHint" required>
         <p id="phoneHint" class="hint">国内の電話番号を入力してください。ハイフンあり・なし、どちらでも入力できます。</p>
-        <label for="customerRequests">ご要望など（任意）</label>
-        <textarea id="customerRequests" rows="4" maxlength="1000" aria-describedby="requestsHint requestsCount"></textarea>
-        <p id="requestsHint" class="hint">要望・希望など伝えておきたいことなどがあればご記入ください</p>
-        <p id="requestsCount" class="hint">0 / 1,000文字</p>
+        <label for="customerRequests">メッセージ・ご要望があればどうぞ（任意）</label>
+        <textarea id="customerRequests" rows="2" maxlength="100"></textarea>
         <section class="cancel-policy" aria-labelledby="cancelPolicyHeading">
             <h3 id="cancelPolicyHeading">キャンセルについて</h3>
             <p id="cancelPolicyText">変更・キャンセルは、できるだけ早めにお願いいたします。<br>当日のキャンセルや大幅な遅刻の場合は、LINE・電話にてご連絡ください。<br>ご連絡なく来店されなかった場合100％のキャンセル料の請求と次回以降のご予約をお断りする場合があります。</p>
@@ -281,7 +279,7 @@ const nameInput = document.getElementById('name');
 const phoneInput = document.getElementById('phone');
 const requestsInput = document.getElementById('customerRequests');
 const policyInput = document.getElementById('cancelPolicy');
-const MAX_REQUESTS_LENGTH = 1000;
+const MAX_REQUESTS_LENGTH = 100;
 const submitBtn = document.getElementById('submitBtn');
 const loadingMsg = document.getElementById('loadingMsg');
 const notice = document.getElementById('notice');
@@ -405,7 +403,6 @@ function renderFlow() {
     nextButton.textContent = pendingSlot ? '空き状況を確認中…' : 'お客様情報へ';
     nextButton.disabled = !bookingReady();
     document.getElementById('reviewBtn').disabled = !bookingReady() || !customerDetailsReady();
-    document.getElementById('requestsCount').textContent = requestsInput.value.length + ' / 1,000文字';
     ['editMenu','editDate','backDate','backCustomer'].forEach(id => { document.getElementById(id).disabled = submitting; });
 }
 function renderMenuCards() {

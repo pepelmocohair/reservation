@@ -510,12 +510,12 @@ for(const requests of ['', '   \n  ', '  静かに過ごしたいです\nカラ�
  assert.equal(s.els.customerRequests.disabled,true);assert.equal(s.els.cancelPolicy.disabled,true);
  req.resolve({status:'success',reservationId:'REQUESTS'});await p;assert.equal(s.els.completedPanel.hidden,false);
 });
-test('1000-character limit accepts boundary, rejects excess including direct assignment and updates counter',async()=>{
- const s=setup();await customerReady(s);s.els.cancelPolicy.checked=true;s.els.customerRequests.value='あ'.repeat(1000);s.els.customerRequests.events.input();
- assert.equal(s.els.reviewBtn.disabled,false);assert.equal(s.els.requestsCount.textContent,'1000 / 1,000文字');assert.match(html,/<textarea id="customerRequests"[^>]*maxlength="1000"/);
+test('100-character limit accepts boundary and rejects excess including direct assignment',async()=>{
+ const s=setup();await customerReady(s);s.els.cancelPolicy.checked=true;s.els.customerRequests.value='あ'.repeat(100);s.els.customerRequests.events.input();
+ assert.equal(s.els.reviewBtn.disabled,false);assert.match(html,/<textarea id="customerRequests"[^>]*maxlength="100"/);
  s.els.customerRequests.value+='あ';s.els.customerRequests.events.input();assert.equal(s.els.reviewBtn.disabled,true);s.run('openReview()');assert.equal(s.els.reviewPanel.hidden,true);
  await s.run('submitReservation()');assert.equal(s.requests.length,0);
- s.els.customerRequests.value='あ'.repeat(1000);s.els.customerRequests.events.input();s.run('openReview()');const p=s.run('submitReservation()'),req=s.requests.shift();assert.equal(JSON.parse(req.options.body).customerRequests.length,1000);req.resolve({status:'success',reservationId:'LIMIT'});await p;
+ s.els.customerRequests.value='あ'.repeat(100);s.els.customerRequests.events.input();s.run('openReview()');const p=s.run('submitReservation()'),req=s.requests.shift();assert.equal(JSON.parse(req.options.body).customerRequests.length,100);req.resolve({status:'success',reservationId:'LIMIT'});await p;
 });
 test('changing requests after review requires reconfirmation and customer back-navigation retains fields',async()=>{
  const s=setup();await customerReady(s);s.els.cancelPolicy.checked=true;s.els.customerRequests.value='最初の要望';s.run('openReview()');
@@ -536,4 +536,10 @@ test('menu loading is large text only and success/failure/retry retain existing 
  s.requests.shift().reject(new Error('offline'));await new Promise(setImmediate);assert.equal(s.els.menuLoading.hidden,true);assert.equal(s.els.retryMenus.hidden,false);
  const p=s.els.retryMenus.events.click();assert.equal(s.els.menuLoading.hidden,false);await ready(s);await p;
  assert.equal(s.els.menuLoading.hidden,true);assert.equal(s.els.menuCards.hidden,false);assert.equal(s.els.retryMenus.hidden,true);assert.ok(s.els.menuCards.children.length);
+});
+
+test('message field uses only the new optional label and a compact two-row textarea',()=>{
+ assert.match(html,/<label for="customerRequests">メッセージ・ご要望があればどうぞ（任意）<\/label>/);
+ assert.match(html,/<textarea id="customerRequests" rows="2" maxlength="100"><\/textarea>/);
+ assert.doesNotMatch(html,/ご要望など（任意）|requestsHint|requestsCount|要望・希望など伝えておきたいことなどがあればご記入ください/);
 });
