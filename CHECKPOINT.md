@@ -228,3 +228,14 @@ TZ=Asia/Tokyo node tests/backend.test.cjs
 - 月曜〜日曜固定の7列を維持し、土曜ヘッダーにsaturday、日曜ヘッダーにsunday classを付与。日付数字と曜日の両方を土曜#2459a6（青）、日曜#b42323（赤）へ変更。月〜金は従来の文字色。theadの文字色のみを変更し、背景や予約可否セル・ハイライト・営業/休業の条件は変更なし。
 - frontend102/102 PASS。土日class・文字色の期待値を新仕様へ更新し、土日もAPI許可なら◎選択・再確認成功で次へが有効になるassertを維持。Chromeで320/390/430/768pxのLoading前後8画面を検証し、日付/曜日の色一致、月〜金の従来色、全ヘッダー背景の従来色、月〜日の並びと既存レイアウト/再確認assertがPASS。320/390/430pxの画像を確認。390/430pxは青い土曜・赤い日曜を7列内で認識可能。320pxでの日曜列への横スクロール制約は従来どおり。diff --check PASS。
 - ux/mobile-speed-v1へのcommitのみ。backend、main、push、本番GAS/Sheets/deployment・公開に変更なし。未追跡references/は維持しcommit対象外。
+
+## 2026-10-02 任意ご要望・キャンセルポリシー・メニューLoading簡素化（未公開）
+
+- ux/mobile-speed-v1でStep3の電話下へ「ご要望など（任意）」textareaを追加。補助文はユーザー指定どおり、上限1,000文字、文字数表示付き。16px文字・4行/最小120px。空欄は予約可能で確認画面に行を作らず、入力時だけ「ご要望など」を改行保持・textContentで表示。POSTにcustomerRequestsの平文を含める。CRLF/CRをLFに統一し前後空白を除去、HTMLは実行しない。
+- Step3にユーザー指定の「キャンセルについて」本文全文と「キャンセルポリシーを確認しました」の初期未チェックcheckboxを追加。ラベル全体48px以上のタップ領域。チェック無しでは確認ボタン/直接Step4呼出/予約POSTを禁止。レビューキーへご要望とチェック状態を含め、確認後の変更を無確認で送信しない。戻る操作で入力保持、POST中は新規入力も無効化、失敗後は再入力可能に戻す。同意状態の保存列は追加しない。
+- バックエンド対応commit：ff8f7077cccdc7af43e013530c61811d8c80cc7d（reservation-gas / ux/mobile-speed-v1、/tmp/reservation-gas-start-30）。末尾N列「ご要望」だけを追加する設計。既存A〜Mは変更なし、旧行のN無し/空欄・旧POSTの項目省略は許容。1,000文字/型をlock前検証、Nは新規行へ事前TEXT設定し日付/数値変換を防止、数式化も防止。改行付き平文で将来Calendar description生成に利用可能。Calendar連携の実装/本番列や見出しの変更はなし。
+- Step1のグレースケルトンDOM/CSSを全撤去し、Loadingは20pxの「メニューを読み込んでいます…」だけ。背景/枠なし、取得中は前回の実メニュー一覧も隠し、完了後はLoadingを消してカードへ戻す。失敗・再試行・複数メニュー・価格/時間は維持。日時画面の領域内Loading等は変更なし。
+- frontend111/111（既存102件＋9件）、backend122/122（既存105件＋17件）、合計233/233 PASS。前回の既存assertは維持し、予約POSTの厳密期待値にcustomerRequests空欄を追加、成功する既存ケースではポリシーチェックを明示するfixture操作を追加。未確認の拒否、空欄/改行/HTML、ご要望の上限・確認後変更、失敗時復帰、文字だけのメニューLoading、N保存/不正型/上限/旧行/取消保持を検証。git diff --checkは両repo PASS。
+- Chromeのローカル模擬APIで4幅（320×740/390×844/430×932/768×1024）の日時Loading前後8画面とStep3/4を検証し、既存日時レイアウト/30分/固定月〜日/土青日赤/再確認ボタンのassertをすべて維持。Step3の未チェック拒否・label48px・textarea16px・横溢れ無し、スクロール後にcheckboxが固定下部操作に隠れないこと、チェック後のStep4と改行付き内容の表示をassert。Step1のLoadingは320/390/430pxで文字20px/背景透明/枠0/子要素pのみをassert。画像を視覚確認（主に390px、320px）。生成画像は/tmp/customer-{幅}{-policy|-review}.png、/tmp/menu-loading-{幅}.png。実iOS/LINE内ブラウザ・キーボード・VoiceOverは実機確認が必要。
+- tests/local-preview.cjsとLOCAL_PREVIEW.mdを追加。準備GASをVMで実行し、Sheets/Lock等はローカルメモリで模擬。フロントAPIを同じローカルサーバー/apiへ置換し本番URLを除去、ヘッダーで確認用/非本番保存と明示。ローカルHTTPのsmokeで現行UI・要望予約POST・競合・電話照合取消・占有解放を確認PASS。サーバーは4173で起動し同じLANのスマホで実機確認可能（ネットワーク/端末側接続は未検証）。ダミー入力だけを使い、再起動で全テスト予約が消える。
+- mainへのmerge/push、本ブランチpush、GitHub Pages、本番GASへのclasp push/deploy、Spreadsheet列/見出し/行の変更、本番API通信は未実施。バックエンド元mainは変更なし。公開前にN未使用/列存在・見出しを確認しGAS→フロントの契約を検証する。今回のcommit SHAは本節を含むGit履歴を参照。未追跡references/は維持しcommit対象外。

@@ -86,9 +86,8 @@
         .steps li { text-align:center; padding:8px 2px; border-bottom:3px solid #dedbd4; color:#666; }
         .steps li[aria-current="step"] { color:#234f43; border-color:#234f43; font-weight:700; background:#eaf2ee; }
         .progress { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); }
-        .menu-loading { padding:20px 14px; background:#fff; border:1px solid #dedbd4; border-radius:6px; }
+        .menu-loading { padding:40px 14px; font-size:20px; font-weight:500; text-align:center; }
         .menu-loading p { margin:0; }
-        .menu-placeholder { height:56px; margin-top:12px; border-radius:4px; background:linear-gradient(90deg,#f0eee7,#f8f7f4,#f0eee7); }
         .menu-card { padding:12px 14px; margin:8px 0; border-radius:6px; }
         .menu-card .card-meta { margin-top:2px; }
         .category-title { margin:16px 0 6px; }
@@ -152,6 +151,13 @@
             #datePanel .date-dock { padding:6px 12px calc(6px + env(safe-area-inset-bottom)); }
             #datePanel .date-dock .btn { min-height:44px; padding:8px; }
         }
+        #customerPanel textarea { font:inherit; font-size:16px; width:100%; min-height:120px; padding:12px; border:1px solid #aaa; border-radius:4px; background:#fff; color:#222; resize:vertical; }
+        .cancel-policy { margin-top:24px; }
+        .cancel-policy h3 { font-size:16px; margin:0 0 8px; }
+        .cancel-policy p { margin:0 0 12px; }
+        #customerPanel .policy-check { display:flex; align-items:center; gap:10px; min-height:48px; cursor:pointer; }
+        #customerPanel .policy-check input { flex:0 0 22px; width:22px; height:22px; min-height:22px; padding:0; accent-color:#234f43; }
+        #reviewDetails dd { white-space:pre-wrap; }
     </style>
 </head>
 
@@ -172,7 +178,7 @@
     <div id="menuPanel">
         <p id="menuHeading" class="hint" tabindex="-1">ご希望のメニューを選択してください（複数選択可）。もう一度押すと解除できます。</p>
         <select id="menu" hidden disabled aria-label="メニュー"><option value="">メニューを読み込み中...</option></select>
-        <div id="menuLoading" class="menu-loading" role="status"><p>メニューを読み込んでいます</p><div class="menu-placeholder" aria-hidden="true"></div><div class="menu-placeholder" aria-hidden="true"></div></div>
+        <div id="menuLoading" class="menu-loading" role="status"><p>メニューを読み込んでいます…</p></div>
         <button id="retryMenus" type="button" hidden>メニューを再取得</button>
         <div id="menuCards" role="group" aria-labelledby="menuHeading"></div>
         <div class="menu-dock" id="menuDock"><div class="menu-dock-inner">
@@ -216,6 +222,15 @@
         <label for="phone">電話番号（必須）</label>
         <input type="tel" id="phone" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="090-1234-5678" aria-describedby="phoneHint" required>
         <p id="phoneHint" class="hint">国内の電話番号を入力してください。ハイフンあり・なし、どちらでも入力できます。</p>
+        <label for="customerRequests">ご要望など（任意）</label>
+        <textarea id="customerRequests" rows="4" maxlength="1000" aria-describedby="requestsHint requestsCount"></textarea>
+        <p id="requestsHint" class="hint">要望・希望など伝えておきたいことなどがあればご記入ください</p>
+        <p id="requestsCount" class="hint">0 / 1,000文字</p>
+        <section class="cancel-policy" aria-labelledby="cancelPolicyHeading">
+            <h3 id="cancelPolicyHeading">キャンセルについて</h3>
+            <p id="cancelPolicyText">変更・キャンセルは、できるだけ早めにお願いいたします。<br>当日のキャンセルや大幅な遅刻の場合は、LINE・電話にてご連絡ください。<br>ご連絡なく来店されなかった場合100％のキャンセル料の請求と次回以降のご予約をお断りする場合があります。</p>
+            <label class="policy-check" for="cancelPolicy"><input id="cancelPolicy" type="checkbox" aria-describedby="cancelPolicyText" required><span>キャンセルポリシーを確認しました</span></label>
+        </section>
         <div class="actions"><button id="backDate" type="button">日時へ戻る</button><button class="btn" id="reviewBtn" type="button" disabled>予約内容を確認する</button></div>
     </section>
     <section class="panel" id="reviewPanel" aria-labelledby="reviewHeading" hidden>
@@ -264,6 +279,9 @@ const menuSelect = document.getElementById('menu');
 const timeSelect = document.getElementById('time');
 const nameInput = document.getElementById('name');
 const phoneInput = document.getElementById('phone');
+const requestsInput = document.getElementById('customerRequests');
+const policyInput = document.getElementById('cancelPolicy');
+const MAX_REQUESTS_LENGTH = 1000;
 const submitBtn = document.getElementById('submitBtn');
 const loadingMsg = document.getElementById('loadingMsg');
 const notice = document.getElementById('notice');
@@ -336,12 +354,20 @@ function bookingReady() {
     return !completed && !submitting && !pendingSlot && !!selectedMenu() && checkedKey === selectionKey() &&
         !timeSelect.disabled && isCustomerStartTime(timeSelect.value) && availableTimes.includes(timeSelect.value);
 }
-function reviewKey() { return [selectionKey(), timeSelect.value, nameInput.value.trim(), normalizedPhone(phoneInput.value)].join('|'); }
+function customerRequests() { return requestsInput.value.replace(/\r\n?/g, '\n').trim(); }
+function customerDetailsReady() {
+    return !!nameInput.value.trim() && !!normalizedPhone(phoneInput.value) &&
+        requestsInput.value.length <= MAX_REQUESTS_LENGTH && policyInput.checked === true;
+}
+function reviewKey() {
+    return JSON.stringify([selectionKey(), timeSelect.value, nameInput.value.trim(),
+        normalizedPhone(phoneInput.value), customerRequests(), policyInput.checked]);
+}
 function showStep(step, focus = true) {
     if (submitting || completed) return;
     if (step !== 'menu' && !selectedMenu()) return;
     if ((step === 'customer' || step === 'review') && !bookingReady()) return;
-    if (step === 'review' && (!nameInput.value.trim() || !normalizedPhone(phoneInput.value))) return;
+    if (step === 'review' && !customerDetailsReady()) return;
     flowStep = step;
     if (step !== 'review') reviewedSelection = null;
     renderFlow();
@@ -378,7 +404,8 @@ function renderFlow() {
     const nextButton = document.getElementById('toCustomer');
     nextButton.textContent = pendingSlot ? '空き状況を確認中…' : 'お客様情報へ';
     nextButton.disabled = !bookingReady();
-    document.getElementById('reviewBtn').disabled = !bookingReady() || !nameInput.value.trim() || !normalizedPhone(phoneInput.value);
+    document.getElementById('reviewBtn').disabled = !bookingReady() || !customerDetailsReady();
+    document.getElementById('requestsCount').textContent = requestsInput.value.length + ' / 1,000文字';
     ['editMenu','editDate','backDate','backCustomer'].forEach(id => { document.getElementById(id).disabled = submitting; });
 }
 function renderMenuCards() {
@@ -430,11 +457,12 @@ function selectMenu(id, toggle = false) {
     if (flowStep === 'date') loadWeek();
 }
 function openReview() {
-    if (!bookingReady() || !nameInput.value.trim() || !normalizedPhone(phoneInput.value)) return;
+    if (!bookingReady() || !customerDetailsReady()) return;
     const menu = selectedMenu();
     reviewDetails.replaceChildren();
     [['メニュー',menu.name],['料金',menu.price],['所要時間',menu.durationMinutes + '分'],
-        ['ご予約日時',dateInput.value + '　' + timeSelect.value],['お名前',nameInput.value.trim()],['電話番号',normalizedPhone(phoneInput.value)]].forEach(([label,value]) => {
+        ['ご予約日時',dateInput.value + '　' + timeSelect.value],['お名前',nameInput.value.trim()],['電話番号',normalizedPhone(phoneInput.value)],
+        ...(customerRequests() ? [['ご要望など',customerRequests()]] : [])].forEach(([label,value]) => {
         const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
         dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); reviewDetails.appendChild(row);
     });
@@ -733,7 +761,7 @@ function selectionKey() {
 function updateSubmit() {
     submitBtn.disabled = completed || submitting || checkedKey !== selectionKey() ||
         timeSelect.disabled || !isCustomerStartTime(timeSelect.value) || !availableTimes.includes(timeSelect.value) ||
-        !nameInput.value.trim() || !normalizedPhone(phoneInput.value);
+        !customerDetailsReady();
     renderFlow();
 }
 
@@ -753,6 +781,7 @@ async function loadMenus() {
     if (completed || menusLoading) return;
     menusLoading = true;
     document.getElementById('menuLoading').hidden = false;
+    menuCards.hidden = true;
     document.getElementById('retryMenus').hidden = true;
     menuCards.setAttribute('aria-busy', 'true');
     requestId++;
@@ -795,7 +824,7 @@ async function loadMenus() {
         menuSelect.replaceChildren(new Option('メニューを取得できませんでした', ''));
         showNotice('メニューを取得できませんでした。再取得ボタンを押してください。');
         document.getElementById('retryMenus').hidden = false;
-    } finally { clearTimeout(timer); menusLoading = false; document.getElementById('menuLoading').hidden = true; menuCards.setAttribute('aria-busy', 'false'); renderCalendar(); renderMenuCards(); renderFlow(); }
+    } finally { clearTimeout(timer); menusLoading = false; document.getElementById('menuLoading').hidden = true; menuCards.hidden = false; menuCards.setAttribute('aria-busy', 'false'); renderCalendar(); renderMenuCards(); renderFlow(); }
 }
 
 async function loadAvailability() {
@@ -858,14 +887,14 @@ async function submitReservation() {
     if (submitBtn.disabled || flowStep !== 'review' || reviewedSelection !== reviewKey()) return;
     const ids = selectedMenuIds();
     const payload = { sourceType: 'WEB_PAGE', requestVersion: 2, ...(ids.length === 1 ? {menuId:ids[0]} : {menuIds:ids}),
-        date: dateInput.value, time: timeSelect.value, name: nameInput.value.trim(), phone: normalizedPhone(phoneInput.value) };
+        date: dateInput.value, time: timeSelect.value, name: nameInput.value.trim(), phone: normalizedPhone(phoneInput.value), customerRequests: customerRequests() };
     const bookedMenuName = selectedMenu().name;
     submitting = true;
     invalidateWeek();
     requestId++;
     if (availabilityController) availabilityController.abort();
     resetTimes('予約を送信中...');
-    [menuSelect, dateInput, nameInput, phoneInput].forEach(element => element.disabled = true);
+    [menuSelect, dateInput, nameInput, phoneInput, requestsInput, policyInput].forEach(element => element.disabled = true);
     renderCalendar(); renderMenuCards(); renderFlow();
     loadingMsg.style.display = 'block';
     showNotice('');
@@ -903,7 +932,7 @@ async function submitReservation() {
         submitting = false;
         loadingMsg.style.display = 'none';
         if (!completed) {
-            [menuSelect, dateInput, nameInput, phoneInput].forEach(element => element.disabled = false);
+            [menuSelect, dateInput, nameInput, phoneInput, requestsInput, policyInput].forEach(element => element.disabled = false);
             flowStep = refreshMenus ? 'menu' : 'date';
             renderMenuCards();
             if (refreshMenus) await loadMenus();
@@ -927,6 +956,8 @@ menuSelect.addEventListener('change', () => selectMenu(menuSelect.value));
 timeSelect.addEventListener('change', updateSubmit);
 nameInput.addEventListener('input', updateSubmit);
 phoneInput.addEventListener('input', updateSubmit);
+requestsInput.addEventListener('input', updateSubmit);
+policyInput.addEventListener('change', updateSubmit);
 submitBtn.addEventListener('click', submitReservation);
 // フラグメントはWebサーバーに送信されない。読取後はアドレス欄から資格を除去。
 let cancelCredentials = null;

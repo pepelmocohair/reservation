@@ -58,4 +58,23 @@ with tempfile.TemporaryDirectory(prefix='calendar-layout-') as folder:
     if width>=390: assert data['at16']['bottom']<=min(data['region']['bottom'],data['dock']['y']),data
    print(width,state,json.dumps(data,ensure_ascii=False))
   assert measurements['loaded']['region']==measurements['loading']['region']
+ for width,height in [(320,740),(390,844),(430,932),(768,1024)]:
+  page=root/f'{width}-loaded.html'
+  result=subprocess.run(['node',str(Path(__file__).with_name('layout.chrome.cjs')),str(width),str(height),page.as_uri(),f'/tmp/customer-{width}.png',str(root / (str(width)+'customer')),'customer'],capture_output=True,text=True,check=True,timeout=30)
+  data=json.loads(result.stdout)
+  if width<768: assert data['policyPosition']['bottom']<=data['policyPosition']['actionsTop']
+  assert data['customer']['unchecked'] and data['customer']['blocked'] and data['customer']['customerVisible']
+  assert data['customer']['textareaHeight']>=120 and data['customer']['textareaFont']=='16px' and data['customer']['checkboxHeight']>=48
+  assert not data['customer']['overflow'] and data['customer']['notesRight']<=width
+  assert data['review']['visible'] and data['review']['confirmEnabled'] and not data['review']['overflow']
+  assert data['review']['requests']=='静かに過ごしたいです\nカラーの相談を希望します'
+  print(width,'customer/review',json.dumps(data,ensure_ascii=False))
+ for width,height in [(320,740),(390,844),(430,932)]:
+  page=root/f'{width}-menu-loading.html'
+  page.write_text(source.replace('<script>','<script>window.fetch=()=>new Promise(()=>{});',1))
+  result=subprocess.run(['node',str(Path(__file__).with_name('layout.chrome.cjs')),str(width),str(height),page.as_uri(),f'/tmp/menu-loading-{width}.png',str(root / (str(width)+'menu')),'menu-loading'],capture_output=True,text=True,check=True,timeout=30)
+  data=json.loads(result.stdout)
+  assert data['text']=='メニューを読み込んでいます…' and data['visible'] and data['font']=='20px'
+  assert data['background']=='rgba(0, 0, 0, 0)' and data['border']=='0px' and data['children']==['P'] and data['cards']==0 and not data['overflow']
+  print(width,'menu-loading',json.dumps(data,ensure_ascii=False))
 print('PASS: four widths, seven headers, compact top, target coverage, loading geometry, tap size')
