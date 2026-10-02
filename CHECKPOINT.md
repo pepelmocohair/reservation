@@ -202,3 +202,13 @@ TZ=Asia/Tokyo node tests/backend.test.cjs
 - Chromeのローカル模擬APIで320×740・390×844・430×932・768×1024のLoading前後8画面を検証。読み込み時の外枠寸法一致・7日ヘッダー・上部230px以内・390px以上の16時までの初期表示を維持。実DOMでも各幅で30分行・モーダル不在・◎即時ハイライト・再確認中の次へ無効・再確認成功後の日時/次へ有効をassert。320pxの7日目横スクロール等の制約は前節のとおり。`python3 tests/layout.check.py`、`node tests/frontend.test.cjs`、`node /tmp/reservation-gas-start-30/tests/backend.test.cjs`で検証。両repo diff --check PASS。
 - 今回はローカルの2つの作業ブランチへのcommitまで。mainへのmerge/push、本ブランチpush、本番公開、clasp push/deploy、Sheets・本番API操作なし。本番GASはVersion17のままなので、API自体の30分限定はバックエンド公開後に適用される。公開前に新GASのAPI契約・POST拒否とフロントを確認する。commit SHAは各ブランチGit履歴で確認。未追跡references/は維持しcommitしない。
 - 対応バックエンドcommit：`5d78e68b3aceb9b46e1e87011ba75e69878c479f`（reservation-gas / ux/mobile-speed-v1）。隔離worktreeは/tmp内にあり、ブランチcommit自体はreservation-gasのGit管理領域に保存済み。元mainは50e18f1を維持。
+
+## 2026-10-02 再確認状態を下部ボタンへ集約（未公開）
+
+- `ux/mobile-speed-v1`上で◎再確認UIを追加改善。◎を押した同期処理で選択セルをハイライトし、下部ボタンを無効の「空き状況を確認中…」へ変更。補助テキストは「選択中：日付 時刻」のみ。隠しtimeStatusにも再確認中の重複案内を出さない。ボタンの表示変更はaria-live=polite/aria-atomic=trueで通知。
+- 再確認成功かつ同じ日時が許可されている場合のみ、同じボタンを「お客様情報へ」に戻して有効化。自動ステップ移動はせず利用者が押して進む。bookingReadyにもpendingSlotの拒否を追加。
+- 日別APIが選択枠を除外/満席/休業を返した場合は週間表を最新応答へ更新して選択解除、「この予約枠は埋まったか、受付できなくなりました。別の◎を選んでください。」を表示。通信エラーは確認失敗と再選択案内を表示。いずれもボタンは「お客様情報へ」に戻るが無効を維持。週・メニュー変更で確認中文字を解除し、旧応答が新しい選択・ボタン状態を上書きしない。
+- 開始30分刻み、slotMinutes=10、メニュー施術時間、◎1タップ、モーダルなし、電話/取消・Version17の仕様は変更なし。今回バックエンドソース/commitは変更なし（対応版5d78e68）。本番API通信・Sheets・clasp反映なし。
+- frontend既存78件を維持し7件追加、85/85 PASS。再確認状態の旧補助テキストassertを新ボタンの厳密assert＋補助テキストに確認中がないassertへ変更し、検証を維持。追加はボタンの同期変更/成功/明示的次へ、別枠が残る競合/満席/休業の3件、通信失敗と再試行、古い再確認が新選択を上書きしないこと、メニュー変更中断。backend105/105 PASS、合計190/190 PASS。diff --check PASS。
+- 4幅（320×740、390×844、430×932、768×1024）×週間Loading前後のChromeローカル模擬API検証もPASS。既存のレイアウトassertを維持し、実DOMの再確認中ボタン文字・日時だけの補助テキスト・確認後ボタン文字を追加assert。本番通信と実機VoiceOverは未検証。
+- mainへのmerge/push、本ブランチpush、本番公開は未実施。今回のcommit SHAは本節を含むux/mobile-speed-v1のGit履歴で確認。未追跡references/は維持しcommit対象外。

@@ -23,8 +23,10 @@ function call(method,params={},sessionId){return new Promise((resolve,reject)=>{
    const date=buttons[0].getAttribute('aria-label').split(' ')[0], time=times[0];buttons[0].click();
    const selected=document.querySelector('#schedule button[aria-pressed="true"]');
    const highlighted=!!selected, pendingDisabled=selected?.disabled && document.getElementById('toCustomer').disabled;
+   const pendingLabel=document.getElementById('toCustomer').textContent;
+   const datetimeOnly=document.getElementById('selectionStatus').textContent==='選択中：'+date+' '+time;
    await new Promise(r=>setTimeout(r,20));
-   return {highlighted,pendingDisabled,times,noModal:!document.querySelector('[role="dialog"]'),confirmed:document.getElementById('date').value===date && document.getElementById('time').value===time && !document.getElementById('toCustomer').disabled};
+   return {highlighted,pendingDisabled,pendingLabel,datetimeOnly,confirmedLabel:document.getElementById('toCustomer').textContent,times,noModal:!document.querySelector('[role="dialog"]'),confirmed:document.getElementById('date').value===date && document.getElementById('time').value===time && !document.getElementById('toCustomer').disabled};
   })()`,awaitPromise:true,returnByValue:true},sessionId);
   if(check.exceptionDetails)throw new Error(JSON.stringify(check.exceptionDetails));
   data.interaction=check.result.value;

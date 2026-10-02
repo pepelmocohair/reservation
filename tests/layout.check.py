@@ -41,6 +41,9 @@ with tempfile.TemporaryDirectory(prefix='calendar-layout-') as folder:
    if state=='loaded':
     assert data['interaction']['highlighted'] and data['interaction']['pendingDisabled']
     assert data['interaction']['confirmed'] and data['interaction']['noModal']
+    assert data['interaction']['pendingLabel']=='空き状況を確認中…'
+    assert data['interaction']['datetimeOnly']
+    assert data['interaction']['confirmedLabel']=='お客様情報へ'
     assert all(re.fullmatch(r'\d{2}:(00|30)', t) for t in data['interaction']['times'])
     assert data['button']['height']>=36 and data['button']['width']>=38
     if width>=390: assert data['at16']['bottom']<=min(data['region']['bottom'],data['dock']['y']),data

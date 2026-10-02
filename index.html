@@ -204,7 +204,7 @@
         <div id="calendarRegion" class="schedule-scroll" tabindex="0" role="region" aria-label="7日間の予約可能時間"><table id="schedule" class="schedule" aria-label="予約可能時間一覧"></table><div id="calendarLoading" class="calendar-loading" role="status" hidden><span class="spinner" aria-hidden="true"></span><span>空き状況を<br>読み込んでいます…</span></div></div>
     </div>
 
-        <div class="date-dock"><p id="selectionStatus" class="hint" role="status" aria-live="polite">◎から開始時刻を選択（黒は予約不可）</p><button class="btn" id="toCustomer" type="button" disabled>お客様情報へ</button></div>
+        <div class="date-dock"><p id="selectionStatus" class="hint" role="status" aria-live="polite">◎から開始時刻を選択（黒は予約不可）</p><button class="btn" id="toCustomer" type="button" aria-live="polite" aria-atomic="true" disabled>お客様情報へ</button></div>
     </section>
     <section class="panel" id="customerPanel" aria-labelledby="customerHeading" hidden>
         <h2 id="customerHeading" tabindex="-1">お客様情報</h2>
@@ -330,7 +330,7 @@ function normalizedPhone(value) {
     return /^0[0-9]{9,10}$/.test(digits) && !/^0+$/.test(digits) ? digits : '';
 }
 function bookingReady() {
-    return !completed && !submitting && !!selectedMenu() && checkedKey === selectionKey() &&
+    return !completed && !submitting && !pendingSlot && !!selectedMenu() && checkedKey === selectionKey() &&
         !timeSelect.disabled && isCustomerStartTime(timeSelect.value) && availableTimes.includes(timeSelect.value);
 }
 function reviewKey() { return [selectionKey(), timeSelect.value, nameInput.value.trim(), normalizedPhone(phoneInput.value)].join('|'); }
@@ -372,7 +372,9 @@ function renderFlow() {
     document.getElementById('dateSummaryText').textContent = dateInput.value + '　' + timeSelect.value;
     document.getElementById('timeContext').textContent = dateInput.value ? dateInput.value + ' の予約可能時間' : '';
     document.getElementById('toDate').disabled = submitting || menuSelect.disabled || !menu;
-    document.getElementById('toCustomer').disabled = !bookingReady();
+    const nextButton = document.getElementById('toCustomer');
+    nextButton.textContent = pendingSlot ? '空き状況を確認中…' : 'お客様情報へ';
+    nextButton.disabled = !bookingReady();
     document.getElementById('reviewBtn').disabled = !bookingReady() || !nameInput.value.trim() || !normalizedPhone(phoneInput.value);
     ['editMenu','editDate','backDate','backCustomer'].forEach(id => { document.getElementById(id).disabled = submitting; });
 }
@@ -461,6 +463,7 @@ function invalidateWeek() {
     if (weekController) weekController.abort();
     weekDays = [];
     document.getElementById('schedule').replaceChildren();
+    renderFlow();
 }
 // slotMinutes remains the ten-minute internal unit. Start times have a separate grid.
 function isCustomerStartTime(time) { return typeof time === 'string' && /^(?:[01]\d|2[0-3]):(?:00|30)$/.test(time); }
@@ -540,15 +543,17 @@ async function recheckWeekSlot(date, time, version) {
     const slot = {date:date, time};
     pendingSlot = slot;
     const pending = loadAvailability();
-    document.getElementById('selectionStatus').textContent = '選択中：' + date + ' ' + time + '（空き状況を再確認中…）';
+    document.getElementById('selectionStatus').textContent = '選択中：' + date + ' ' + time;
     renderWeek();
     const selectionRequest = requestId;
-    await pending;
+    const outcome = await pending;
     if (pendingSlot !== slot) return;
     pendingSlot = null;
-    renderWeek();
+    renderFlow(); renderWeek();
     document.getElementById('selectionStatus').textContent = checkedKey === selectionKey() && availableTimes.includes(time) ?
-        '選択中：' + date + ' ' + time : 'この日時を選択できません。別の◎を選んでください。';
+        '選択中：' + date + ' ' + time : outcome === 'error' ?
+        '空き状況を確認できませんでした。同じ枠か別の◎を選んでください。' :
+        'この予約枠は埋まったか、受付できなくなりました。別の◎を選んでください。';
     if (selectionRequest !== requestId || version !== weekVersion || dateInput.value !== date || checkedKey !== selectionKey() || !availableTimes.includes(time)) return;
     timeSelect.value = time;
     timeStatus.textContent = '選択中：' + date + ' ' + time;
@@ -787,7 +792,7 @@ async function loadAvailability() {
     if (!date || !menu) return;
     if (date < dateInput.min) { showNotice('今日以降の日付を選択してください。'); return; }
     const key = selectionKey();
-    resetTimes('空き状況を確認中...');
+    resetTimes(pendingSlot ? '' : '空き状況を確認中...');
     const controller = new AbortController();
     availabilityController = controller;
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -804,12 +809,12 @@ async function loadAvailability() {
             displayedDay.error = false;
             renderWeek();
         }
-        if (data.isClosed) { resetTimes('休業日です'); showNotice('この日は休業日です。'); return; }
+        if (data.isClosed) { resetTimes('休業日です'); showNotice('この日は休業日です。'); return 'unavailable'; }
         const startTimes = customerAvailability(data).availableStartTimes;
         if (!startTimes.length) {
             resetTimes('予約可能な時間がありません');
             showNotice('この日は予約可能な時間がありません。');
-            return;
+            return 'unavailable';
         }
         // 時刻をローカル生成・補完しない。GASが許可した時刻だけを表示。
         availableTimes = startTimes;
@@ -820,10 +825,12 @@ async function loadAvailability() {
         timeStatus.textContent = '開始時刻を選択してください。';
         renderTimeButtons();
         updateSubmit();
+        return 'available';
     } catch (error) {
         if (currentRequest !== requestId || key !== selectionKey()) return;
         resetTimes('空き状況を取得できませんでした');
         showNotice(error.name === 'AbortError' ? '取得に時間がかかっています。日付を選び直してください。' : error.message);
+        return 'error';
     } finally { clearTimeout(timer); }
 }
 

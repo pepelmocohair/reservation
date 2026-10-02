@@ -254,7 +254,7 @@ test('circle highlights synchronously, blocks repeated and other taps until reva
  const old=s.els.schedule.children[1].children[1].children[1].children[0];const p=old.events.click();
  const selected=s.els.schedule.children[1].children[1].children[1].children[0];
  assert.equal(selected.attributes['aria-pressed'],'true');assert.equal(selected.disabled,true);
- assert.match(s.els.selectionStatus.textContent,/選択中.*再確認中/);assert.equal(s.els.toCustomer.disabled,true);
+ assert.match(s.els.selectionStatus.textContent,/^選択中：\d{4}-\d{2}-\d{2} 10:30$/);assert.equal(s.els.toCustomer.textContent,'空き状況を確認中…');assert.equal(s.els.toCustomer.disabled,true);
  await old.events.click();await s.els.schedule.children[1].children[1].children[2].children[0].events.click();
  assert.equal(s.requests.length,1);s.run("showStep('customer')");assert.equal(s.els.customerPanel.hidden,true);
  const req=s.requests.shift(),date=new URL(req.url).searchParams.get('date');req.resolve(response(date));await p;
@@ -315,7 +315,7 @@ for(const time of ['10:00','10:30','11:00']) test('half-hour circle selects exac
  const index=rows.findIndex(r=>r.children[0].textContent===time);
  const p=rows[index].children[1].children[0].events.click();
  assert.equal(s.els.schedule.children[1].children[index].children[1].children[0].attributes['aria-pressed'],'true');
- assert.match(s.els.selectionStatus.textContent,/再確認中/);assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.requests.length,1);
+ assert.equal(s.els.toCustomer.textContent,'空き状況を確認中…');assert.doesNotMatch(s.els.selectionStatus.textContent,/確認中/);assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.requests.length,1);
  const req=s.requests.shift();req.resolve(response(new URL(req.url).searchParams.get('date'),['10:00','10:30','11:00']));await p;
  assert.equal(s.els.time.value,time);assert.equal(s.els.toCustomer.disabled,false);
  assert.equal(s.els.schedule.children[1].children[index].children[1].children[0].attributes['aria-pressed'],'true');
@@ -368,4 +368,55 @@ test('existing cancellation preview retains previously saved ten-minute start',a
  s.els.cancelPhone.value='09012345678';const p=s.run('submitCancellation()'),req=s.requests.shift();
  assert.equal(JSON.parse(req.options.body).action,'cancelReservation');req.resolve({status:'success'});await p;
  assert.match(s.els.cancelNotice.textContent,/予約をキャンセルしました/);
+});
+
+test('recheck belongs to disabled next button, date text has no duplicate status and success requires explicit next tap',async()=>{
+ const s=setup();await ready(s);s.run("selectMenu('m1');showStep('date',false)");const week=s.requests.shift();week.resolve(weekResponse(week));await new Promise(setImmediate);
+ const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click(),req=s.requests.shift(),date=new URL(req.url).searchParams.get('date');
+ assert.equal(s.els.toCustomer.textContent,'空き状況を確認中…');assert.equal(s.els.toCustomer.disabled,true);
+ assert.equal(s.els.selectionStatus.textContent,'選択中：'+date+' 10:30');assert.doesNotMatch(s.els.timeStatus.textContent,/確認中/);
+ assert.equal(s.els.schedule.children[1].children[1].children[1].children[0].attributes['aria-pressed'],'true');
+ s.els.toCustomer.events.click();assert.equal(s.els.customerPanel.hidden,true);
+ req.resolve(response(date,['10:30']));await p;
+ assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,false);
+ assert.equal(s.els.selectionStatus.textContent,'選択中：'+date+' 10:30');assert.equal(s.els.customerPanel.hidden,true);
+ s.els.toCustomer.events.click();assert.equal(s.els.customerPanel.hidden,false);
+});
+for(const [label,times,closed] of [['slot filled, another time remains',['11:00'],false],['full day',[],false],['closed day',[],true]]) test('unavailable recheck resets next button and selection, shows latest black cells: '+label,async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
+ const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click(),req=s.requests.shift(),date=new URL(req.url).searchParams.get('date');
+ req.resolve({...response(date,times),isClosed:closed,openingTime:'10:00',closingTime:'11:30'});await p;
+ assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.els.time.value,'');assert.equal(s.run('pendingSlot'),null);
+ assert.equal(s.els.schedule.children[1].children[1].children[1].className,'unavailable');
+ assert.equal(s.els.schedule.children[1].children.flatMap(r=>r.children.slice(1)).flatMap(c=>c.children).some(b=>b.attributes['aria-pressed']==='true'),false);
+ assert.match(s.els.selectionStatus.textContent,/予約枠は埋まったか、受付できなくなりました/);assert.doesNotMatch(s.els.selectionStatus.textContent,/確認中/);
+ if(times.length)assert.equal(s.els.schedule.children[1].children[2].children[1].children[0].textContent,'◎');
+ s.els.toCustomer.events.click();assert.equal(s.els.customerPanel.hidden,true);
+});
+test('network failure restores disabled next button and retry re-enters button loading until confirmed',async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
+ let p=s.els.schedule.children[1].children[1].children[1].children[0].events.click();s.requests.shift().reject(new Error('offline'));await p;
+ assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,true);
+ assert.equal(s.els.time.value,'');assert.match(s.els.selectionStatus.textContent,/確認できませんでした/);
+ const button=s.els.schedule.children[1].children[1].children[1].children[0];assert.equal(button.attributes['aria-pressed'],'false');assert.equal(button.disabled,false);
+ p=button.events.click();assert.equal(s.els.toCustomer.textContent,'空き状況を確認中…');assert.equal(s.els.toCustomer.disabled,true);
+ const req=s.requests.shift();req.resolve(response(new URL(req.url).searchParams.get('date'),['10:30']));await p;
+ assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,false);
+});
+test('old recheck cannot replace the loading button or date text for a newer selection',async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
+ const oldPromise=s.els.schedule.children[1].children[1].children[1].children[0].events.click(),old=s.requests.shift();
+ s.run('moveWeek(1)');assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,true);
+ const week=s.requests.shift();week.resolve(weekResponse(week));await new Promise(setImmediate);
+ const nextPromise=s.els.schedule.children[1].children[1].children[2].children[0].events.click(),next=s.requests.shift(),date=new URL(next.url).searchParams.get('date');
+ old.resolve(response(new URL(old.url).searchParams.get('date')));await oldPromise;
+ assert.equal(s.els.toCustomer.textContent,'空き状況を確認中…');assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.els.selectionStatus.textContent,'選択中：'+date+' 10:30');
+ next.resolve(response(date));await nextPromise;assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,false);assert.equal(s.els.date.value,date);
+});
+test('menu change during recheck clears loading button and stale response cannot enable next',async()=>{
+ const s=setup();await ready(s,[menu,{...menu,id:'m2'}]);s.els.menu.value='m1';await weekReady(s);
+ const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click(),old=s.requests.shift();s.run("selectMenu('m2')");
+ assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,true);
+ old.resolve(response(new URL(old.url).searchParams.get('date')));await p;
+ assert.equal(s.els.toCustomer.textContent,'お客様情報へ');assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.els.time.value,'');
 });
