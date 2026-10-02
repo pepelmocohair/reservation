@@ -8,8 +8,9 @@ fixture = '''window.fetch = async (url) => ({ok:true,json:async()=>{
  const p=new URL(url).searchParams;
  if(p.get('action')==='menus')return {status:'success',slotMinutes:10,menus:[{id:'m1',category:'カット',name:'カット',price:'¥3,800',durationMinutes:60,bookable:true,webBookingEnabled:true}]};
  if(window.keepLoading)return await new Promise(()=>{});
- const start=p.get('startDate'), times=Array.from({length:48},(_,i)=>{const n=600+i*10;return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')});
- return {status:'success',slotMinutes:10,startDate:start,menuId:'m1',days:Object.fromEntries(Array.from({length:7},(_,i)=>{const date=addDays(start,i);return [date,{status:'success',slotMinutes:10,date,menuId:'m1',isClosed:i===3,availableStartTimes:i===3?[]:times,openingTime:'10:00',closingTime:'19:00'}]}))};
+ const start=p.get('startDate'), times=Array.from({length:16},(_,i)=>{const n=600+i*30;return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')});
+ if(p.get('action')==='availability')return {status:'success',slotMinutes:10,startIntervalMinutes:30,date:p.get('date'),menuId:'m1',isClosed:false,availableStartTimes:times,openingTime:'10:00',closingTime:'19:00'};
+ return {status:'success',slotMinutes:10,startIntervalMinutes:30,startDate:start,menuId:'m1',days:Object.fromEntries(Array.from({length:7},(_,i)=>{const date=addDays(start,i);return [date,{status:'success',slotMinutes:10,date,menuId:'m1',isClosed:i===3,availableStartTimes:i===3?[]:times,openingTime:'10:00',closingTime:'19:00'}]}))};
 }});
 '''
 measure = '''setTimeout(()=>{
@@ -38,6 +39,9 @@ with tempfile.TemporaryDirectory(prefix='calendar-layout-') as folder:
    assert data['region']['y']<=230, data
    assert data['loading']==(state=='loading')
    if state=='loaded':
+    assert data['interaction']['highlighted'] and data['interaction']['pendingDisabled']
+    assert data['interaction']['confirmed'] and data['interaction']['noModal']
+    assert all(re.fullmatch(r'\d{2}:(00|30)', t) for t in data['interaction']['times'])
     assert data['button']['height']>=36 and data['button']['width']>=38
     if width>=390: assert data['at16']['bottom']<=min(data['region']['bottom'],data['dock']['y']),data
    print(width,state,json.dumps(data,ensure_ascii=False))

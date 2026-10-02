@@ -16,5 +16,18 @@ function call(method,params={},sessionId){return new Promise((resolve,reject)=>{
  }
  if(!result.result.value)throw new Error('Layout fixture did not finish');
  const shot=await call('Page.captureScreenshot',{format:'png'},sessionId);fs.writeFileSync(png,Buffer.from(shot.data,'base64'));
- process.stdout.write(result.result.value);
+ const data=JSON.parse(result.result.value);
+ if(!data.loading){
+  const check=await call('Runtime.evaluate',{expression:`(async()=>{
+   const buttons=[...document.querySelectorAll('#schedule button')], times=[...document.querySelectorAll('#schedule tbody th')].map(e=>e.textContent);
+   const date=buttons[0].getAttribute('aria-label').split(' ')[0], time=times[0];buttons[0].click();
+   const selected=document.querySelector('#schedule button[aria-pressed="true"]');
+   const highlighted=!!selected, pendingDisabled=selected?.disabled && document.getElementById('toCustomer').disabled;
+   await new Promise(r=>setTimeout(r,20));
+   return {highlighted,pendingDisabled,times,noModal:!document.querySelector('[role="dialog"]'),confirmed:document.getElementById('date').value===date && document.getElementById('time').value===time && !document.getElementById('toCustomer').disabled};
+  })()`,awaitPromise:true,returnByValue:true},sessionId);
+  if(check.exceptionDetails)throw new Error(JSON.stringify(check.exceptionDetails));
+  data.interaction=check.result.value;
+ }
+ process.stdout.write(JSON.stringify(data));
 }finally{chrome.kill();}})().catch(e=>{console.error(e);process.exitCode=1;});

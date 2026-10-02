@@ -23,16 +23,16 @@ function setup(hash=''){
 }
 async function ready(s,entries=[menu]){s.requests.shift().resolve({status:'success',slotMinutes:10,menus:entries});await new Promise(setImmediate);}
 function availability(s,date='2099-01-06') {s.els.date.value=date;s.els.menu.value='m1';return s.run('loadAvailability()');}
-const response=(date='2099-01-06',times=['10:40','11:20'])=>({status:'success',slotMinutes:10,date,menuId:'m1',isClosed:false,availableStartTimes:times});
+const response=(date='2099-01-06',times=['10:30','11:30'])=>({status:'success',slotMinutes:10,date,menuId:'m1',isClosed:false,availableStartTimes:times});
 test('initial state empty time and disabled submit, only menus GET',async()=>{const s=setup();assert.equal(s.els.time.value,'');assert.equal(s.els.submitBtn.disabled,true);assert.equal(s.requests.length,1);assert.match(s.requests[0].url,/action=menus/);await ready(s);assert.equal(s.els.time.disabled,true);assert.equal(s.els.menu.value,'')});
 test('only master labels shown, OFF hidden and null time disabled',async()=>{const s=setup();await ready(s,[menu,{...menu,id:'off',webBookingEnabled:false},{...menu,id:'unset',bookable:false,unavailableReason:'duration_not_set',durationMinutes:null}]);const options=s.els.menu.children[1].children;assert.equal(options.length,2);assert.equal(options[0].textContent,'マスター名 ¥1,234〜 / 70分');assert.equal(options[1].disabled,true)});
-test('only availableStartTimes become options; explicit selection and name required',async()=>{const s=setup();await ready(s);const p=availability(s);assert.equal(s.els.submitBtn.disabled,true);s.requests.shift().resolve(response());await p;assert.deepEqual(s.els.time.children.map(x=>x.value),['','10:40','11:20']);assert.equal(s.els.time.value,'');s.els.time.value='10:40';s.run('updateSubmit()');assert.equal(s.els.submitBtn.disabled,true);s.els.name.value='テスト';s.run('updateSubmit()');assert.equal(s.els.submitBtn.disabled,false)});
+test('only availableStartTimes become options; explicit selection and name required',async()=>{const s=setup();await ready(s);const p=availability(s);assert.equal(s.els.submitBtn.disabled,true);s.requests.shift().resolve(response());await p;assert.deepEqual(s.els.time.children.map(x=>x.value),['','10:30','11:30']);assert.equal(s.els.time.value,'');s.els.time.value='10:30';s.run('updateSubmit()');assert.equal(s.els.submitBtn.disabled,true);s.els.name.value='テスト';s.run('updateSubmit()');assert.equal(s.els.submitBtn.disabled,false)});
 test('date input immediately invalidates old availability',async()=>{const s=setup();await ready(s);const p=availability(s);s.requests.shift().resolve(response());await p;s.els.date.value='2099-01-07';s.els.date.events.input();assert.equal(s.els.time.value,'');assert.equal(s.els.submitBtn.disabled,true)});
-test('stale response cannot replace newer availability',async()=>{const s=setup();await ready(s);const first=availability(s);const old=s.requests.shift();const second=availability(s,'2099-01-07');s.requests.shift().resolve(response('2099-01-07',['12:10']));await second;old.resolve(response());await first;assert.deepEqual(s.els.time.children.map(x=>x.value),['','12:10'])});
+test('stale response cannot replace newer availability',async()=>{const s=setup();await ready(s);const first=availability(s);const old=s.requests.shift();const second=availability(s,'2099-01-07');s.requests.shift().resolve(response('2099-01-07',['12:30']));await second;old.resolve(response());await first;assert.deepEqual(s.els.time.children.map(x=>x.value),['','12:30'])});
 for(const [label,data] of [['closed',{...response(),isClosed:true}],['full',response(undefined,[])],['missing times',{...response(),availableStartTimes:undefined}],['off grid',response(undefined,['10:45'])],['old API',{status:'success',reservedTimes:[]}],['error',{status:'configuration_error',message:'未準備'}]])test('fail closed '+label,async()=>{const s=setup();await ready(s);const p=availability(s);s.requests.shift().resolve(data);await p;assert.equal(s.els.time.disabled,true);assert.equal(s.els.submitBtn.disabled,true)});
 test('GET network failure disables booking',async()=>{const s=setup();await ready(s);const p=availability(s);s.requests.shift().reject(new Error('offline'));await p;assert.equal(s.els.submitBtn.disabled,true)});
-test('POST sends ID only, disables controls, no duplicate submission, completes',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='テスト';s.run('openReview()');p=s.run('submitReservation()');assert.equal(s.els.menu.disabled,true);assert.equal(s.els.date.disabled,true);assert.equal(s.els.submitBtn.disabled,true);const post=s.requests.shift();assert.equal(post.options.method,'POST');assert.deepEqual(JSON.parse(post.options.body),{sourceType:'WEB_PAGE',requestVersion:2,menuId:'m1',date:'2099-01-06',time:'10:40',name:'テスト',phone:'09012345678'});await s.run('submitReservation()');assert.equal(s.requests.length,0);post.resolve({status:'success',reservationId:'R1'});await p;assert.equal(s.requests.length,0);assert.equal(s.els.time.value,'');assert.equal(s.els.submitBtn.disabled,true);assert.equal(s.els.completedDetails.children[0].children[1].textContent,'R1')});
-test('uncertain POST never automatically retries',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='テスト';s.run('openReview()');p=s.run('submitReservation()');s.requests.shift().reject(new Error('lost response'));await new Promise(setImmediate);assert.match(s.requests[0].url,/action=availability/);s.requests.shift().resolve(response());await p;assert.match(s.els.notice.textContent,/登録済みの可能性/);assert.equal(s.els.submitBtn.disabled,true)});
+test('POST sends ID only, disables controls, no duplicate submission, completes',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:30';s.els.name.value='テスト';s.run('openReview()');p=s.run('submitReservation()');assert.equal(s.els.menu.disabled,true);assert.equal(s.els.date.disabled,true);assert.equal(s.els.submitBtn.disabled,true);const post=s.requests.shift();assert.equal(post.options.method,'POST');assert.deepEqual(JSON.parse(post.options.body),{sourceType:'WEB_PAGE',requestVersion:2,menuId:'m1',date:'2099-01-06',time:'10:30',name:'テスト',phone:'09012345678'});await s.run('submitReservation()');assert.equal(s.requests.length,0);post.resolve({status:'success',reservationId:'R1'});await p;assert.equal(s.requests.length,0);assert.equal(s.els.time.value,'');assert.equal(s.els.submitBtn.disabled,true);assert.equal(s.els.completedDetails.children[0].children[1].textContent,'R1')});
+test('uncertain POST never automatically retries',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:30';s.els.name.value='テスト';s.run('openReview()');p=s.run('submitReservation()');s.requests.shift().reject(new Error('lost response'));await new Promise(setImmediate);assert.match(s.requests[0].url,/action=availability/);s.requests.shift().resolve(response());await p;assert.match(s.els.notice.textContent,/登録済みの可能性/);assert.equal(s.els.submitBtn.disabled,true)});
 
 test('calendar gates dates until menu selection, marks today and blocks past dates',async()=>{
  const s=setup();await ready(s);assert.equal(s.els.calendar.disabled,true);
@@ -51,8 +51,8 @@ test('calendar click requests selected date, time buttons reflect only API and r
  const s=setup();await ready(s);s.els.menu.value='m1';s.run("calendarMonth='2099-01';renderCalendar()");
  s.els.calendarDays.children.find(x=>x.textContent==='6').events.click();assert.match(s.requests[0].url,/date=2099-01-06/);
  s.requests.shift().resolve(response());await new Promise(setImmediate);
- assert.deepEqual(s.els.timeButtons.children.map(x=>x.textContent),['10:40','11:20']);assert.equal(s.els.time.value,'');
- s.els.name.value='名前';s.els.timeButtons.children[0].events.click();assert.equal(s.els.time.value,'10:40');assert.equal(s.els.submitBtn.disabled,false);
+ assert.deepEqual(s.els.timeButtons.children.map(x=>x.textContent),['10:30','11:30']);assert.equal(s.els.time.value,'');
+ s.els.name.value='名前';s.els.timeButtons.children[0].events.click();assert.equal(s.els.time.value,'10:30');assert.equal(s.els.submitBtn.disabled,false);
  assert.equal(s.els.timeButtons.children[0].attributes['aria-pressed'],'true');
 });
 test('menu change clears time buttons and old response cannot restore them',async()=>{
@@ -61,20 +61,20 @@ test('menu change clears time buttons and old response cannot restore them',asyn
  assert.equal(s.els.timeButtons.children.length,0);assert.equal(s.els.time.value,'');assert.equal(s.els.date.value,'');
  assert.equal(s.requests.length,0);assert.match(s.els.menuDetails.textContent,/マスター名/);
  s.els.toDate.events.click();const req=s.requests.shift();assert.match(req.url,/menuId=m2/);
- req.resolve(weekResponse(req,['13:10']));await new Promise(setImmediate);
+ req.resolve(weekResponse(req,['13:30']));await new Promise(setImmediate);
  assert.equal(s.run('weekMenuId'),'m2');
 });
 
 test('cards use master fields, hide OFF and disable unbookable',async()=>{const s=setup();await ready(s,[menu,{...menu,id:'off',webBookingEnabled:false},{...menu,id:'unset',bookable:false,durationMinutes:null}]);const cards=s.els.menuCards.children[0].children.slice(1);assert.equal(cards.length,2);assert.equal(cards[1].disabled,true);cards[0].events.click();assert.equal(s.els.menu.value,'m1');assert.equal(s.els.toDate.disabled,false);assert.equal(s.els.customerPanel.hidden,true);s.els.toDate.events.click();assert.equal(s.els.datePanel.hidden,false);});
-test('review displays exact data and POST cannot bypass review or use changed name',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='確認名';await s.run('submitReservation()');assert.equal(s.requests.length,0);s.run('openReview()');assert.equal(s.els.reviewPanel.hidden,false);assert.deepEqual(s.els.reviewDetails.children.map(row=>row.children[1].textContent),['マスター名','¥1,234〜','70分','2099-01-06　10:40','確認名','09012345678']);s.els.name.value='変更名';await s.run('submitReservation()');assert.equal(s.requests.length,0);});
-test('changing date invalidates reviewed booking and closes customer path',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:40';s.els.name.value='確認名';s.run('openReview()');s.els.editDate.events.click();s.run('invalidateWeek()');s.requests.shift().reject(new Error('cancelled'));p=availability(s,'2099-01-07');assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.els.reviewPanel.hidden,true);s.requests.shift().resolve(response('2099-01-07',[]));await p;await s.run('submitReservation()');assert.equal(s.requests.length,0);});
+test('review displays exact data and POST cannot bypass review or use changed name',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:30';s.els.name.value='確認名';await s.run('submitReservation()');assert.equal(s.requests.length,0);s.run('openReview()');assert.equal(s.els.reviewPanel.hidden,false);assert.deepEqual(s.els.reviewDetails.children.map(row=>row.children[1].textContent),['マスター名','¥1,234〜','70分','2099-01-06　10:30','確認名','09012345678']);s.els.name.value='変更名';await s.run('submitReservation()');assert.equal(s.requests.length,0);});
+test('changing date invalidates reviewed booking and closes customer path',async()=>{const s=setup();await ready(s);let p=availability(s);s.requests.shift().resolve(response());await p;s.els.time.value='10:30';s.els.name.value='確認名';s.run('openReview()');s.els.editDate.events.click();s.run('invalidateWeek()');s.requests.shift().reject(new Error('cancelled'));p=availability(s,'2099-01-07');assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.els.reviewPanel.hidden,true);s.requests.shift().resolve(response('2099-01-07',[]));await p;await s.run('submitReservation()');assert.equal(s.requests.length,0);});
 
-function weekResponse(req,times=['10:40']) {
+function weekResponse(req,times=['10:30']) {
  const params=new URL(req.url).searchParams,start=params.get('startDate'),menuId=params.get('menuId');
  const dates=params.has('dates')?params.get('dates').split(','):Array.from({length:7},(_,i)=>{const d=new Date(start+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+i);return d.toISOString().slice(0,10)});
- return {status:'success',slotMinutes:10,startDate:start,menuId,days:Object.fromEntries(dates.map(date=>[date,{...response(date,times),menuId,openingTime:'10:30',closingTime:'11:00'}]))};
+ return {status:'success',slotMinutes:10,startDate:start,menuId,days:Object.fromEntries(dates.map(date=>[date,{...response(date,times),menuId,openingTime:'10:00',closingTime:'11:30'}]))};
 }
-async function weekReady(s,times=['10:40']) {
+async function weekReady(s,times=['10:30']) {
  const p=s.run('loadWeek()'),req=s.requests.shift();req.resolve(weekResponse(req,times));await p;
 }
 test('week grid uses single API for circles, black for unavailable and unknown while loading',async()=>{
@@ -82,14 +82,14 @@ test('week grid uses single API for circles, black for unavailable and unknown w
  const p=s.run('loadWeek()');assert.equal(s.requests.length,1);const req=s.requests.shift();assert.match(req.url,/action=availabilityWeek/);
  assert.equal(s.els.schedule.children[1].children[0].children[1].className,'unknown');
  req.resolve(weekResponse(req));await p;assert.equal(s.requests.length,0);
- const rows=s.els.schedule.children[1].children;assert.deepEqual(rows.map(r=>r.children[0].textContent),['10:30','10:40','10:50']);
+ const rows=s.els.schedule.children[1].children;assert.deepEqual(rows.map(r=>r.children[0].textContent),['10:00','10:30','11:00']);
  assert.equal(rows[0].children[1].className,'unavailable');assert.equal(rows[1].children[1].children[0].textContent,'◎');assert.equal(rows[2].children[1].className,'unavailable');
 });
 test('week cell revalidates with API and selects exact date and time',async()=>{
  const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
  const button=s.els.schedule.children[1].children[1].children[1].children[0];const p=button.events.click();
- const req=s.requests.shift();const date=new URL(req.url).searchParams.get('date');req.resolve(response(date,['10:40']));await p;
- assert.equal(s.els.time.value,'10:40');assert.equal(s.els.date.value,date);assert.equal(s.els.toCustomer.disabled,false);
+ const req=s.requests.shift();const date=new URL(req.url).searchParams.get('date');req.resolve(response(date,['10:30']));await p;
+ assert.equal(s.els.time.value,'10:30');assert.equal(s.els.date.value,date);assert.equal(s.els.toCustomer.disabled,false);
 });
 test('failed days never appear black; stale weekly response cannot overwrite',async()=>{
  const s=setup();await ready(s);s.els.menu.value='m1';const p=s.run('loadWeek()');const old=s.requests.shift();s.run('invalidateWeek()');old.resolve(response());await p;assert.equal(s.els.schedule.children.length,0);
@@ -101,7 +101,7 @@ test('recheck turns newly filled cell black and refuses selection',async()=>{
  const s=setup();await ready(s);s.els.menu.value='m1';await weekReady(s);
  const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click();
  const req=s.requests.shift(),date=new URL(req.url).searchParams.get('date');
- req.resolve({...response(date,[]),openingTime:'10:30',closingTime:'11:00'});await p;
+ req.resolve({...response(date,[]),openingTime:'10:00',closingTime:'11:30'});await p;
  assert.equal(s.els.time.value,'');assert.equal(s.els.toCustomer.disabled,true);
  assert.equal(s.els.schedule.children[1].children[1].children[1].className,'unavailable');
 });
@@ -137,20 +137,20 @@ test('combined week and daily use IDs only, review and POST preserve selection a
  assert.deepEqual(JSON.parse(params.get('menuIds')),ids);assert.equal(params.has('menuId'),false);assert.equal(s.requests.length,0);
  let data=weekResponse(req);delete data.menuId;data.menuIds=ids;Object.values(data.days).forEach(d=>{delete d.menuId;d.menuIds=ids});req.resolve(data);await p;
  p=s.els.schedule.children[1].children[1].children[1].children[0].events.click();req=s.requests.shift();params=new URL(req.url).searchParams;
- assert.deepEqual(JSON.parse(params.get('menuIds')),ids);const date=params.get('date'),daily={...response(date,['10:40']),menuIds:ids};delete daily.menuId;
+ assert.deepEqual(JSON.parse(params.get('menuIds')),ids);const date=params.get('date'),daily={...response(date,['10:30']),menuIds:ids};delete daily.menuId;
  req.resolve(daily);await p;s.els.name.value='複数テスト';s.run('openReview()');assert.equal(s.els.reviewDetails.children[2].children[1].textContent,'160分');
- p=s.run('submitReservation()');const post=s.requests.shift();assert.deepEqual(JSON.parse(post.options.body),{sourceType:'WEB_PAGE',requestVersion:2,menuIds:ids,date,time:'10:40',name:'複数テスト',phone:'09012345678'});
+ p=s.run('submitReservation()');const post=s.requests.shift();assert.deepEqual(JSON.parse(post.options.body),{sourceType:'WEB_PAGE',requestVersion:2,menuIds:ids,date,time:'10:30',name:'複数テスト',phone:'09012345678'});
  await s.run('submitReservation()');assert.equal(s.requests.length,0);post.resolve({status:'success',reservationId:'MULTI'});await p;assert.equal(s.els.completedPanel.hidden,false);
 });
 test('changing combination aborts old weekly response and clears reviewed date and time',async()=>{
  const s=setup();await ready(s,[menu,{...menu,id:'m2'}]);s.run("selectMenu('m1',true);selectMenu('m2',true)");const p=s.run('loadWeek()'),old=s.requests.shift();
- s.els.time.value='10:40';s.els.date.value='2099-01-06';s.run("selectMenu('m2',true)");assert.equal(old.options.signal.aborted,true);assert.equal(s.els.date.value,'');assert.equal(s.els.time.value,'');
+ s.els.time.value='10:30';s.els.date.value='2099-01-06';s.run("selectMenu('m2',true)");assert.equal(old.options.signal.aborted,true);assert.equal(s.els.date.value,'');assert.equal(s.els.time.value,'');
  old.resolve(weekResponse(old));await p;assert.equal(s.run('weekDays.length'),0);assert.equal(s.els.submitBtn.disabled,true);
 });
 
 async function reviewReady(s,phone='09012345678') {
  await ready(s);const p=availability(s);s.requests.shift().resolve(response());await p;
- s.els.time.value='10:40';s.els.name.value='電話テスト';s.els.phone.value=phone;s.run('openReview()');
+ s.els.time.value='10:30';s.els.name.value='電話テスト';s.els.phone.value=phone;s.run('openReview()');
 }
 for(const phone of ['090-1234-5678','09012345678','03-1234-5678','０９０－１２３４－５６７８']) test('phone accepted and POST normalized: '+phone,async()=>{
  const s=setup();await reviewReady(s,phone);const p=s.run('submitReservation()');const req=s.requests.shift();
@@ -164,7 +164,7 @@ test('success displays submitted details, hides entire form and cannot start ano
  const s=setup();await reviewReady(s);const p=s.run('submitReservation()');s.requests.shift().resolve({status:'success',reservationId:'DONE'});await p;
  assert.equal(s.els.bookingForm.hidden,true);assert.equal(s.els.completedPanel.hidden,false);
  for(const step of ['menu','date','customer','review']) assert.equal(s.els[step+'Panel'].hidden,true);
- assert.deepEqual(s.els.completedDetails.children.map(row=>row.children[1].textContent),['DONE','マスター名','2099-01-06　10:40']);
+ assert.deepEqual(s.els.completedDetails.children.map(row=>row.children[1].textContent),['DONE','マスター名','2099-01-06　10:30']);
  assert.equal(s.els.phone.disabled,true);assert.equal(s.els.submitBtn.disabled,true);
  await s.run("showStep('menu');selectMenu('m1');loadAvailability();loadWeek();loadMenus();submitReservation()");assert.equal(s.requests.length,0);assert.equal(s.els.bookingForm.hidden,true);
  assert.match(html,/ご予約を承りました。/);assert.match(html,/予約手続きは完了しました。この画面は閉じていただいて大丈夫です。/);
@@ -182,7 +182,7 @@ test('conflict POST keeps form and error, never displays completion',async()=>{
 const token='a'.repeat(64),cancelHash='#cancel=WEB-TEST&token='+token;
 async function cancellationReady(s,cancelled=false) {
  assert.equal(s.requests.length,1);const request=s.requests.shift();assert.equal(request.options.method,'POST');assert.equal(JSON.parse(request.options.body).action,'cancelPreview');
- assert.equal(request.url.includes(token),false);request.resolve({status:'success',date:'2099-01-06',time:'10:40',menu:'カット ＋ カラー',cancelled});await new Promise(setImmediate);
+ assert.equal(request.url.includes(token),false);request.resolve({status:'success',date:'2099-01-06',time:'10:30',menu:'カット ＋ カラー',cancelled});await new Promise(setImmediate);
 }
 test('v2 POST shows fragment cancel link without phone after booking success',async()=>{
  const s=setup();await reviewReady(s);const p=s.run('submitReservation()'),req=s.requests.shift();assert.equal(JSON.parse(req.options.body).requestVersion,2);
@@ -191,7 +191,7 @@ test('v2 POST shows fragment cancel link without phone after booking success',as
 });
 test('opening cancel link only previews, hides booking form, scrubs address and exposes no name/phone',async()=>{
  const s=setup(cancelHash);assert.equal(s.run('location.hash'),'#cancel');assert.equal(s.els.bookingForm.hidden,true);await cancellationReady(s);
- assert.deepEqual(s.els.cancelDetails.children.map(r=>r.children[1].textContent),['2099-01-06　10:40','カット ＋ カラー']);assert.equal(s.requests.length,0);assert.equal(s.els.cancelSubmit.disabled,true);assert.equal(s.els.completedPanel.hidden,true);
+ assert.deepEqual(s.els.cancelDetails.children.map(r=>r.children[1].textContent),['2099-01-06　10:30','カット ＋ カラー']);assert.equal(s.requests.length,0);assert.equal(s.els.cancelSubmit.disabled,true);assert.equal(s.els.completedPanel.hidden,true);
 });
 test('explicit cancellation sends token ID phone, blocks double click and shows completed only on success',async()=>{
  const s=setup(cancelHash);await cancellationReady(s);s.els.cancelPhone.value='090-1234-5678';s.els.cancelPhone.events.input();
@@ -227,7 +227,7 @@ test('saved completion link opens preview in same page via hashchange without an
 test('late preview cannot overwrite a newer cancellation target',async()=>{
  const s=setup(cancelHash),old=s.requests.shift();s.run("location.hash='#cancel=WEB-NEW&token="+'b'.repeat(64)+"';openCancellation()");
  const next=s.requests.shift();next.resolve({status:'success',date:'2099-01-07',time:'11:00',menu:'新しい対象',cancelled:false});await new Promise(setImmediate);
- old.resolve({status:'success',date:'2099-01-06',time:'10:40',menu:'古い対象',cancelled:false});await new Promise(setImmediate);
+ old.resolve({status:'success',date:'2099-01-06',time:'10:30',menu:'古い対象',cancelled:false});await new Promise(setImmediate);
  assert.deepEqual(s.els.cancelDetails.children.map(r=>r.children[1].textContent),['2099-01-07　11:00','新しい対象']);
 });
 test('late cancel response cannot mark a different target cancelled',async()=>{
@@ -292,7 +292,7 @@ test('tapping already validated selected circle keeps selection without redundan
  const p=s.els.schedule.children[1].children[1].children[1].children[0].events.click(),req=s.requests.shift();
  req.resolve(response(new URL(req.url).searchParams.get('date')));await p;
  await s.els.schedule.children[1].children[1].children[1].children[0].events.click();
- assert.equal(s.requests.length,0);assert.equal(s.els.time.value,'10:40');assert.equal(s.els.toCustomer.disabled,false);
+ assert.equal(s.requests.length,0);assert.equal(s.els.time.value,'10:30');assert.equal(s.els.toCustomer.disabled,false);
 });
 
 test('weekly loading is inside calendar, retains seven headers and replaces overlay on success',async()=>{
@@ -304,28 +304,68 @@ test('weekly loading is inside calendar, retains seven headers and replaces over
  assert.equal(s.els.calendarLoading.hidden,true);assert.equal(s.els.calendarRegion.attributes['aria-busy'],'false');
  assert.equal(s.els.schedule.children[1].children[1].children[1].children[0].textContent,'◎');
 });
-async function longWeek(s,times=['10:00','10:10','10:20','10:40']) {
+async function longWeek(s,times=['10:00','10:30','11:00']) {
  await ready(s);s.run("selectMenu('m1')");const p=s.run('loadWeek()'),req=s.requests.shift(),data=weekResponse(req,times);
  Object.values(data.days).forEach(day=>{day.openingTime='10:00';day.closingTime='19:00'});req.resolve(data);await p;
 }
-for(const time of ['10:00','10:10','10:20']) test('half-hour band preserves exact API ten-minute selection '+time,async()=>{
+for(const time of ['10:00','10:30','11:00']) test('half-hour circle selects exact start immediately without modal '+time,async()=>{
  const s=setup();await longWeek(s);const rows=s.els.schedule.children[1].children;
  assert.equal(rows.length,18);assert.deepEqual(rows.slice(0,3).map(r=>r.children[0].textContent),['10:00','10:30','11:00']);
- rows[0].children[1].children[0].events.click();assert.equal(rows[0].children[1].children[0].attributes['aria-pressed'],'true');assert.equal(s.requests.length,0);assert.equal(s.els.slotPicker.hidden,false);
- assert.deepEqual(s.els.slotOptions.children.map(b=>b.textContent),['10:00','10:10','10:20']);
- const p=s.els.slotOptions.children.find(b=>b.textContent===time).events.click();assert.equal(s.els.slotPicker.hidden,true);
- assert.match(s.els.selectionStatus.textContent,/再確認中/);assert.equal(rows[0].children[1].children[0].textContent,'◎');
- const req=s.requests.shift();req.resolve(response(new URL(req.url).searchParams.get('date'),['10:00','10:10','10:20']));await p;
+ assert.doesNotMatch(html,/slotPicker|slot-picker|slotOptions|openSlotPicker/);
+ const index=rows.findIndex(r=>r.children[0].textContent===time);
+ const p=rows[index].children[1].children[0].events.click();
+ assert.equal(s.els.schedule.children[1].children[index].children[1].children[0].attributes['aria-pressed'],'true');
+ assert.match(s.els.selectionStatus.textContent,/再確認中/);assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.requests.length,1);
+ const req=s.requests.shift();req.resolve(response(new URL(req.url).searchParams.get('date'),['10:00','10:30','11:00']));await p;
  assert.equal(s.els.time.value,time);assert.equal(s.els.toCustomer.disabled,false);
- assert.equal(s.els.schedule.children[1].children[0].children[1].children[0].attributes['aria-pressed'],'true');
+ assert.equal(s.els.schedule.children[1].children[index].children[1].children[0].attributes['aria-pressed'],'true');
 });
-test('band offers only available API times, closes on week change and old choices cannot book',async()=>{
- const s=setup();await longWeek(s,['10:20']);s.els.schedule.children[1].children[0].children[1].children[0].events.click();
- assert.deepEqual(s.els.slotOptions.children.map(b=>b.textContent),['10:20']);const old=s.els.slotOptions.children[0];
- s.run('moveWeek(1)');assert.equal(s.els.slotPicker.hidden,true);await old.events.click();assert.equal(s.requests.length,1);assert.equal(s.els.time.value,'');
+test('only exact authorized starts show circles and stale circle cannot book after week change',async()=>{
+ const s=setup();await longWeek(s,['10:30']);const rows=s.els.schedule.children[1].children;
+ assert.equal(rows[0].children[1].className,'unavailable');const old=rows[1].children[1].children[0];
+ s.run('moveWeek(1)');await old.events.click();assert.equal(s.requests.length,1);assert.equal(s.els.time.value,'');
 });
 test('weekly loading failure exits overlay and keeps retry; stale response cannot clear new loading',async()=>{
  const s=setup();await ready(s);s.els.menu.value='m1';const p=s.run('loadWeek()'),old=s.requests.shift();
  s.run('moveWeek(1)');const next=s.requests.shift();old.resolve(weekResponse(old));await p;assert.equal(s.els.calendarLoading.hidden,false);
  next.reject(new Error('offline'));await new Promise(setImmediate);assert.equal(s.els.calendarLoading.hidden,true);assert.equal(s.els.retryWeek.hidden,false);
+});
+
+for(const metadata of [undefined,30]) test('customer UI exposes only authorized half-hour starts with API metadata '+metadata,async()=>{
+ const s=setup();await ready(s);s.els.menu.value='m1';const p=s.run('loadWeek()'),req=s.requests.shift();
+ const data=weekResponse(req,['10:10','10:20','10:30','10:40','10:50']);
+ Object.values(data.days).forEach(day=>{day.startIntervalMinutes=metadata;day.openingTime='10:00';day.closingTime='11:30'});req.resolve(data);await p;
+ const rows=s.els.schedule.children[1].children;
+ assert.deepEqual(rows.map(r=>r.children[0].textContent),['10:00','10:30','11:00']);
+ assert.equal(rows[0].children[1].className,'unavailable');assert.equal(rows[1].children[1].children[0].textContent,'◎');assert.equal(rows[2].children[1].className,'unavailable');
+ const click=rows[1].children[1].children[0].events.click(),daily=s.requests.shift();
+ daily.resolve({...response(new URL(daily.url).searchParams.get('date'),['10:10','10:20','10:30','10:40','10:50']),startIntervalMinutes:metadata});await click;
+ assert.deepEqual(s.els.time.children.map(o=>o.value),['','10:30']);assert.deepEqual(s.els.timeButtons.children.map(b=>b.textContent),['10:30']);
+ assert.equal(s.els.time.value,'10:30');assert.equal(s.els.toCustomer.disabled,false);
+ s.els.name.value='予約テスト';s.run('openReview()');const post=s.run('submitReservation()'),request=s.requests.shift();
+ assert.equal(JSON.parse(request.options.body).time,'10:30');request.resolve({status:'success',reservationId:'HALF-HOUR'});await post;
+});
+test('available off-grid times do not imply availability at nearby half-hour boundary',async()=>{
+ const s=setup();await longWeek(s,['10:10','10:20','10:40','10:50']);
+ assert.ok(s.els.schedule.children[1].children.every(row=>row.children.slice(1).every(cell=>cell.className==='unavailable')));
+ assert.match(s.els.weekStatus.textContent,/予約できる時間がありません/);
+ const p=availability(s);s.requests.shift().resolve(response(undefined,['10:10','10:20','10:40','10:50']));await p;
+ assert.equal(s.els.time.disabled,true);assert.equal(s.els.timeButtons.children.length,0);assert.equal(s.els.toCustomer.disabled,true);
+});
+for(const time of ['10:10','10:20','10:40','10:50']) test('manual off-grid selection cannot enable review or send POST: '+time,async()=>{
+ const s=setup();await ready(s);const p=availability(s);s.requests.shift().resolve(response(undefined,['10:30','10:40','11:00']));await p;
+ s.els.time.value=time;s.els.name.value='変更テスト';s.run('updateSubmit();openReview()');
+ assert.equal(s.els.toCustomer.disabled,true);assert.equal(s.els.submitBtn.disabled,true);assert.equal(s.els.reviewPanel.hidden,true);
+ await s.run('submitReservation()');assert.equal(s.requests.length,0);
+});
+test('wrong declared start interval fails closed while slotMinutes stays ten',async()=>{
+ const s=setup();await ready(s);const p=availability(s);s.requests.shift().resolve({...response(undefined,['10:30']),startIntervalMinutes:10});await p;
+ assert.equal(s.els.time.disabled,true);assert.equal(s.els.submitBtn.disabled,true);
+});
+test('existing cancellation preview retains previously saved ten-minute start',async()=>{
+ const s=setup(cancelHash);s.requests.shift().resolve({status:'success',date:'2099-01-06',time:'10:40',menu:'以前の予約',cancelled:false});await new Promise(setImmediate);
+ assert.equal(s.els.cancelDetails.children[0].children[1].textContent,'2099-01-06　10:40');
+ s.els.cancelPhone.value='09012345678';const p=s.run('submitCancellation()'),req=s.requests.shift();
+ assert.equal(JSON.parse(req.options.body).action,'cancelReservation');req.resolve({status:'success'});await p;
+ assert.match(s.els.cancelNotice.textContent,/予約をキャンセルしました/);
 });

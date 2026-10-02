@@ -143,11 +143,6 @@
         .spinner { width:24px; height:24px; border:3px solid #dedbd4; border-top-color:#234f43; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:12px; }
         @keyframes spin { to { transform:rotate(360deg); } }
         @media(prefers-reduced-motion:reduce) { .spinner { animation:none; } }
-        .slot-picker { position:fixed; inset:0; z-index:50; background:#0006; display:flex; align-items:center; justify-content:center; padding:16px; }
-        .slot-picker-inner { background:#fff; padding:20px; border-radius:8px; width:min(100%,360px); }
-        .slot-picker-inner p { margin:0 0 12px; }
-        .slot-options { display:flex; gap:8px; margin-bottom:12px; }
-        .slot-options button { flex:1; min-height:48px; }
         @media(max-width:767px) {
             #datePanel .schedule-scroll { margin:0 -10px; height:calc(100dvh - 240px); }
             #datePanel .schedule { min-width:320px; }
@@ -211,7 +206,6 @@
 
         <div class="date-dock"><p id="selectionStatus" class="hint" role="status" aria-live="polite">◎から開始時刻を選択（黒は予約不可）</p><button class="btn" id="toCustomer" type="button" disabled>お客様情報へ</button></div>
     </section>
-    <div id="slotPicker" class="slot-picker" hidden role="dialog" aria-modal="true" aria-labelledby="slotPickerLabel"><div class="slot-picker-inner"><p id="slotPickerLabel"></p><div id="slotOptions" class="slot-options"></div><button id="closeSlotPicker" type="button">閉じる</button></div></div>
     <section class="panel" id="customerPanel" aria-labelledby="customerHeading" hidden>
         <h2 id="customerHeading" tabindex="-1">お客様情報</h2>
         <label for="name">お名前（フルネーム）</label>
@@ -337,7 +331,7 @@ function normalizedPhone(value) {
 }
 function bookingReady() {
     return !completed && !submitting && !!selectedMenu() && checkedKey === selectionKey() &&
-        !timeSelect.disabled && availableTimes.includes(timeSelect.value);
+        !timeSelect.disabled && isCustomerStartTime(timeSelect.value) && availableTimes.includes(timeSelect.value);
 }
 function reviewKey() { return [selectionKey(), timeSelect.value, nameInput.value.trim(), normalizedPhone(phoneInput.value)].join('|'); }
 function showStep(step, focus = true) {
@@ -345,7 +339,6 @@ function showStep(step, focus = true) {
     if (step !== 'menu' && !selectedMenu()) return;
     if ((step === 'customer' || step === 'review') && !bookingReady()) return;
     if (step === 'review' && (!nameInput.value.trim() || !normalizedPhone(phoneInput.value))) return;
-    if (step !== 'date') closeSlotPicker();
     flowStep = step;
     if (step !== 'review') reviewedSelection = null;
     renderFlow();
@@ -461,7 +454,6 @@ function addDays(date, days) {
     return value.toISOString().slice(0,10);
 }
 function invalidateWeek() {
-    closeSlotPicker();
     document.getElementById('calendarLoading').hidden = true;
     pendingSlot = null;
     weekLoadingKey = null;
@@ -470,9 +462,17 @@ function invalidateWeek() {
     weekDays = [];
     document.getElementById('schedule').replaceChildren();
 }
+// slotMinutes remains the ten-minute internal unit. Start times have a separate grid.
+function isCustomerStartTime(time) { return typeof time === 'string' && /^(?:[01]\d|2[0-3]):(?:00|30)$/.test(time); }
+function customerAvailability(data) {
+    // Version 17 responses may still contain ten-minute candidates during rollout.
+    // Keep only API-authorized half-hour starts; never round or synthesize candidates.
+    return {...data, availableStartTimes:[...new Set(data.availableStartTimes.filter(isCustomerStartTime))]};
+}
 function validAvailability(data, date, menuId) {
     return data.date === date && responseMenuKey(data) === menuId && data.slotMinutes === 10 &&
         typeof data.isClosed === 'boolean' && Array.isArray(data.availableStartTimes) &&
+        (data.startIntervalMinutes === undefined || data.startIntervalMinutes === 30) &&
         data.availableStartTimes.every(time => /^(?:[01]\d|2[0-3]):[0-5]0$/.test(time));
 }
 function renderWeek() {
@@ -496,31 +496,26 @@ function renderWeek() {
         const toMinutes = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) ? Number(value.slice(0,2))*60+Number(value.slice(3)) : null;
         const start = toMinutes(day.data.openingTime), end = toMinutes(day.data.closingTime);
         if (start !== null && end !== null) {
-            for (let minute = Math.ceil(start/10)*10; minute < end; minute+=10)
+            for (let minute = Math.ceil(start/30)*30; minute < end; minute+=30)
                 times.add(String(Math.floor(minute/60)).padStart(2,'0') + ':' + String(minute%60).padStart(2,'0'));
         }
     });
     const body = document.createElement('tbody');
-    let labels = [...times].sort();
-    // Long days use half-hour bands; short API ranges retain exact ten-minute rows.
-    const grouped = labels.length > 18;
-    const band = time => time.slice(0,3) + (Number(time.slice(3)) < 30 ? '00' : '30');
-    if (grouped) labels = [...new Set(labels.map(band))];
+    const labels = [...times].filter(isCustomerStartTime).sort();
     if (!labels.length) labels.push('—');
     labels.forEach(time => {
         const row = document.createElement('tr'), label = document.createElement('th');
         label.textContent = time; label.setAttribute('scope','row'); row.appendChild(label);
         weekDays.forEach(day => {
             const cell = document.createElement('td');
-            const choices = day.data && !day.data.isClosed ? [...new Set(day.data.availableStartTimes)].filter(t => grouped ? band(t) === time : t === time).sort() : [];
-            const canBook = choices.length > 0;
+            const canBook = day.data && !day.data.isClosed && day.data.availableStartTimes.includes(time);
             if (canBook) {
                 const button = document.createElement('button'); button.type = 'button'; button.textContent = '◎';
                 button.disabled = submitting || !!pendingSlot || weekMenuId !== menuSelect.value;
-                button.setAttribute('aria-label', day.date + ' ' + time + (grouped ? 'から30分間の開始時刻を選択' : ' 予約可能'));
-                button.setAttribute('aria-pressed', String(pendingSlot ? pendingSlot.date === day.date && choices.includes(pendingSlot.time) : dateInput.value === day.date && choices.includes(timeSelect.value)));
+                button.setAttribute('aria-label', day.date + ' ' + time + ' 予約可能');
+                button.setAttribute('aria-pressed', String(pendingSlot ? pendingSlot.date === day.date && pendingSlot.time === time : dateInput.value === day.date && timeSelect.value === time));
                 const version = weekVersion;
-                button.addEventListener('click', () => grouped ? openSlotPicker(day.date, choices, version, button) : selectWeekSlot(day.date, time, version));
+                button.addEventListener('click', () => selectWeekSlot(day.date, time, version));
                 cell.appendChild(button);
             } else {
                 cell.className = day.data ? 'unavailable' : 'unknown';
@@ -538,6 +533,7 @@ function selectWeekSlot(date, time, version) {
 }
 async function recheckWeekSlot(date, time, version) {
     if (submitting || completed || pendingSlot || version !== weekVersion || weekMenuId !== menuSelect.value) return;
+    if (!isCustomerStartTime(time)) return;
     if (bookingReady() && dateInput.value === date && timeSelect.value === time) return;
     dateInput.value = date;
     calendarMonth = date.slice(0,7);
@@ -560,41 +556,6 @@ async function recheckWeekSlot(date, time, version) {
 
 }
 
-let slotPickerTrigger = null;
-let slotPickerPressed = false;
-function closeSlotPicker() {
-    document.getElementById('slotPicker').hidden = true;
-    if (slotPickerTrigger) {
-        slotPickerTrigger.setAttribute('aria-pressed', String(slotPickerPressed));
-        slotPickerTrigger.focus();
-    }
-    slotPickerTrigger = null;
-}
-function openSlotPicker(date, choices, version, trigger) {
-    if (completed || submitting || pendingSlot || version !== weekVersion) return;
-    slotPickerTrigger = trigger;
-    slotPickerPressed = dateInput.value === date && choices.includes(timeSelect.value);
-    trigger.setAttribute('aria-pressed', 'true');
-    const picker = document.getElementById('slotPicker');
-    const options = document.getElementById('slotOptions'); options.replaceChildren();
-    document.getElementById('slotPickerLabel').textContent = date + ' 開始時刻を選択';
-    choices.forEach(time => {
-        const button = document.createElement('button'); button.type = 'button'; button.textContent = time;
-        button.addEventListener('click', () => { closeSlotPicker(); return selectWeekSlot(date, time, version); });
-        options.appendChild(button);
-    });
-    picker.hidden = false;
-    options.children[0].focus();
-}
-document.getElementById('closeSlotPicker').addEventListener('click', closeSlotPicker);
-document.getElementById('slotPicker').addEventListener('keydown', event => {
-    if (event.key === 'Escape') closeSlotPicker();
-    if (event.key === 'Tab') {
-        const buttons = [...document.getElementById('slotOptions').children, document.getElementById('closeSlotPicker')];
-        const index = buttons.indexOf(document.activeElement);
-        event.preventDefault(); buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
-    }
-});
 let weekLoadingKey = null;
 async function loadWeek(retryFailed = false) {
     if (completed || !selectedMenu() || submitting) return;
@@ -632,7 +593,7 @@ async function loadWeek(retryFailed = false) {
         targets.forEach(date => {
             const day = weekDays.find(item=>item.date===date), result = data.days[date];
             if (result && result.status === 'success' && validAvailability(result,date,menuId)) {
-                day.data = result; day.error = false;
+                day.data = customerAvailability(result); day.error = false;
             } else { day.error = true; delete day.data; }
         });
     } catch(error) {
@@ -747,7 +708,7 @@ function selectionKey() {
 
 function updateSubmit() {
     submitBtn.disabled = completed || submitting || checkedKey !== selectionKey() ||
-        timeSelect.disabled || !availableTimes.includes(timeSelect.value) ||
+        timeSelect.disabled || !isCustomerStartTime(timeSelect.value) || !availableTimes.includes(timeSelect.value) ||
         !nameInput.value.trim() || !normalizedPhone(phoneInput.value);
     renderFlow();
 }
@@ -834,25 +795,24 @@ async function loadAvailability() {
         const data = await requestJSON(GAS_WEB_APP_URL + '?action=availability&date=' +
             encodeURIComponent(date) + menuQuery(menuId), { signal: controller.signal });
         if (currentRequest !== requestId || key !== selectionKey()) return;
-        if (data.date !== date || responseMenuKey(data) !== menuId || data.slotMinutes !== 10 ||
-            typeof data.isClosed !== 'boolean' || !Array.isArray(data.availableStartTimes) ||
-            !data.availableStartTimes.every(time => /^(?:[01]\d|2[0-3]):[0-5]0$/.test(time))) {
+        if (!validAvailability(data, date, menuId)) {
             throw new Error('空き状況の形式が不正です。');
         }
         const displayedDay = weekMenuId === menuId && weekDays.find(day => day.date === date);
         if (displayedDay) {
-            displayedDay.data = data;
+            displayedDay.data = customerAvailability(data);
             displayedDay.error = false;
             renderWeek();
         }
         if (data.isClosed) { resetTimes('休業日です'); showNotice('この日は休業日です。'); return; }
-        if (!data.availableStartTimes.length) {
+        const startTimes = customerAvailability(data).availableStartTimes;
+        if (!startTimes.length) {
             resetTimes('予約可能な時間がありません');
             showNotice('この日は予約可能な時間がありません。');
             return;
         }
         // 時刻をローカル生成・補完しない。GASが許可した時刻だけを表示。
-        availableTimes = [...new Set(data.availableStartTimes)];
+        availableTimes = startTimes;
         timeSelect.replaceChildren(new Option('開始時刻を選択してください', ''),
             ...availableTimes.map(time => new Option(time, time)));
         timeSelect.disabled = false;

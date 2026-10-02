@@ -192,3 +192,13 @@ TZ=Asia/Tokyo node tests/backend.test.cjs
 - `python3 tests/layout.check.py`は本番fetchを模擬データで置換しChrome DevToolsで正確なviewportを指定、320×740・390×844・430×932・768×1024それぞれ取得中/取得後を確認（8画面）。7日ヘッダー、390px以上の7日同時表示、表開始230px以内、36px以上の◎高さ、390px以上で16時行が初期表示領域に収まること、Loading前後の外枠寸法一致を検証。スクリーンショットは/tmp/calendar-{幅}-{loaded|loading}.png。生成HTML・画像・プロファイルはcommitしない。
 - 全4幅を画像確認。390×844は10:00〜16:30を初期表示、430×932・768×1024は17時台まで。320×740は7日目に横スクロールが必要で初期表示は15時頃まで。約208pxの上部、約86pxの下部操作、37px程度の行により390pxでも実表示高が約730px未満なら16時までは収まらない。ブラウザバー・safe-area・拡大文字・長い複数メニューで可視範囲は減る。実機では◎と隣接日の押し分け、30分帯→10分時刻選択、再確認中/競合、週移動、Loadingと取得後の位置、バー表示時の可視範囲、VoiceOverを確認する。
 - 本番GAS Version17・API/台帳の仕様変更なし。mainへのmerge/commit/push、本ブランチのpush、clasp反映・公開、本番予約・Sheets変更なし。ユーザー提供の未追跡references/は維持しcommit対象外。commit SHAは本節を含むブランチのGit履歴で確認する。
+
+## 2026-10-02 予約開始30分刻みへの仕様変更（未公開）
+
+- ユーザーの新仕様により前節の30分帯→10分時刻モーダルを廃止。DOM/CSS/JSを完全撤去。週間表は常に00/30分の行で、◎はその時刻から選択メニュー全時間を確保できるAPI許可時刻だけ。帯内の別時刻から◎を作らない。◎1タップで即時ハイライト・正確な日時の再確認、成功時にお客様情報へを有効化。旧Version17応答も許可候補の00/30分のみを抽出し、非境界の値を丸めたり補完したりしない。
+- 日別選択肢・隠しselect・時間ボタン・確認/POSTも30分開始に制限。slotMinutes=10の検証は維持、新APIの任意startIntervalMinutesは定義されていれば30を要求。施術時間50/110分等は変更なし。4ステップ、Loading、再確認、連打防止、同じ確認済み枠のGET抑止、電話・キャンセル仕様を維持。既存予約の10:40などの取消プレビューはそのまま表示・取消可能。
+- バックエンドは別reservation-gasのmainを変更せず、同名ux/mobile-speed-v1の隔離worktree `/tmp/reservation-gas-start-30`で修正。SLOT_MINUTES=10とSTART_INTERVAL_MINUTES=30を分離。日別/週間候補の生成とWEB POST検証を30分境界に変更。110分10:30開始の占有終端は12:20、次候補は12:30。10/20分の隙間は表示しない。保存時間/スナップショット・既存予約・重複/ScriptLockは丸めず維持。
+- テスト：frontend78/78、backend105/105、計183/183 PASS。既存69/94件を新仕様に整合して維持（モーダル選択テストは直接30分選択へ変更、10:40成功のfixtureを10:30等へ変更、既存assertの削除/緩和でPASSさせていない）。追加20件は30分だけのUI候補、新旧API候補の絞り込み、周辺10分候補から◎を作らない、手動非境界値の予約拒否、メタデータ不正、既存10分予約の取消、非30分POST拒否、110/50分の正確な占有、10/20分隙間、複数メニュー160分。
+- Chromeのローカル模擬APIで320×740・390×844・430×932・768×1024のLoading前後8画面を検証。読み込み時の外枠寸法一致・7日ヘッダー・上部230px以内・390px以上の16時までの初期表示を維持。実DOMでも各幅で30分行・モーダル不在・◎即時ハイライト・再確認中の次へ無効・再確認成功後の日時/次へ有効をassert。320pxの7日目横スクロール等の制約は前節のとおり。`python3 tests/layout.check.py`、`node tests/frontend.test.cjs`、`node /tmp/reservation-gas-start-30/tests/backend.test.cjs`で検証。両repo diff --check PASS。
+- 今回はローカルの2つの作業ブランチへのcommitまで。mainへのmerge/push、本ブランチpush、本番公開、clasp push/deploy、Sheets・本番API操作なし。本番GASはVersion17のままなので、API自体の30分限定はバックエンド公開後に適用される。公開前に新GASのAPI契約・POST拒否とフロントを確認する。commit SHAは各ブランチGit履歴で確認。未追跡references/は維持しcommitしない。
+- 対応バックエンドcommit：`5d78e68b3aceb9b46e1e87011ba75e69878c479f`（reservation-gas / ux/mobile-speed-v1）。隔離worktreeは/tmp内にあり、ブランチcommit自体はreservation-gasのGit管理領域に保存済み。元mainは50e18f1を維持。
