@@ -248,3 +248,10 @@ TZ=Asia/Tokyo node tests/backend.test.cjs
 - 320/390/430/768pxで既存の日時・Step3/4・ポリシー・メニューLoadingのブラウザ検証をすべて実行しPASS。textareaが全幅で80px、横溢れなし、チェックは固定下部操作に隠れないことを確認。390pxの入力画面と320pxのポリシー画面を画像確認。日時画面のコード/レイアウトは変更なし。
 - LOCAL_PREVIEW.mdの上限説明を100文字へ更新。実機確認用ローカルプレビューを再起動して新しい画面/バックエンドへ更新。作業ブランチへのcommitだけで、本番公開・mainへのmerge・push・clasp反映・本番Spreadsheet変更なし。
 - 対応バックエンドcommit：4fdf85e59e9d17a8e03050b9a2063669b2ab9888（reservation-gas / ux/mobile-speed-v1）。
+
+## 2026-10-02 キャンセルポリシー本文の差し替え（未公開）
+
+- Step3「キャンセルについて」をユーザー指定の新しい全文へ変更し、当日連絡の段落と無断来店しなかった場合の段落の間に空行を設けた。確認ラベル・required checkboxは従来のまま。予約/電話/キャンセル/空き状況等の処理は変更なし。
+- 任意欄のラベル、補助文/カウンター削除、2行/80px、フロント/バックエンド100文字上限は前節どおり維持。今回バックエンドのソース・列設計は変更なし。
+- frontend113/113、backend123/123、計236/236 PASS。新しい全文・改行/段落・確認ラベル/必須属性の厳密テストを追加。4幅の既存Chrome検証を全実行してPASS（日時・メニューLoading・Step3/4・ポリシーの操作/固定下部ボタンとの位置関係）。390pxの新本文を画像確認。git diff --check PASS。
+- 実機向けローカルプレビューを新本文で再起動。本番GAS/Sheets/main/merge/push/公開は未変更。今回変更ファイルはindex.html、tests/frontend.test.cjs、CHECKPOINT.md。ブランチcommit SHAは本節を含むGit履歴で確認。

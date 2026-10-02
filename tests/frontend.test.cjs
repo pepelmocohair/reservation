@@ -543,3 +543,9 @@ test('message field uses only the new optional label and a compact two-row texta
  assert.match(html,/<textarea id="customerRequests" rows="2" maxlength="100"><\/textarea>/);
  assert.doesNotMatch(html,/ご要望など（任意）|requestsHint|requestsCount|要望・希望など伝えておきたいことなどがあればご記入ください/);
 });
+
+test('cancellation policy matches supplied text with paragraph break and retains required confirmation label',()=>{
+ const text=html.match(/<p id="cancelPolicyText">([\s\S]*?)<\/p>/)[1].replace(/<br>/g,'\n');
+ assert.equal(text,'変更・キャンセルは、できるだけ早めにご連絡をお願いいたします。\n当日のキャンセルや大幅な遅刻の場合は、LINEまたはお電話にてご連絡ください。\n\nご連絡なく来店されなかった場合は、施術料金の100％をキャンセル料としてお願いする場合がございます。\nまた、以降のご予約をお受けできない場合がございます。');
+ assert.match(html,/<input id="cancelPolicy" type="checkbox" aria-describedby="cancelPolicyText" required><span>キャンセルポリシーを確認しました<\/span>/);
+});
