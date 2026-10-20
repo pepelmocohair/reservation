@@ -1,0 +1,31 @@
+/* Customer WEB palette and spacing follow the existing root index.html. */
+* { box-sizing:border-box; }
+body { margin:0; padding:32px 16px; background:#f7f6f2; color:#222; font:15px/1.8 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif; }
+.container { max-width:620px; min-width:0; margin:auto; }
+.brand { margin:0; font-weight:700; letter-spacing:.04em; }
+h1 { margin:8px 0 24px; font-size:24px; line-height:1.5; }
+h2 { margin:0 0 16px; font-size:19px; }
+.panel { min-width:0; padding:24px; border:1px solid #dedbd4; border-radius:8px; background:#fff; }
+p,h1,h2,dt,dd,button { overflow-wrap:anywhere; }
+.review { margin:16px 0; }
+.review > div { display:grid; grid-template-columns:minmax(0,100px) minmax(0,1fr); gap:12px; padding:12px 0; border-bottom:1px solid #eee; }
+dt { color:#666; }
+dd { min-width:0; margin:0; white-space:pre-wrap; }
+label { display:block; margin:16px 0 6px; font-weight:600; }
+input,textarea { width:100%; min-width:0; min-height:48px; padding:12px; border:1px solid #aaa; border-radius:4px; color:inherit; background:#fff; font:inherit; }
+textarea { resize:vertical; }
+.hint { color:#666; font-size:13px; }
+.btn { display:block; width:100%; min-height:48px; margin-top:16px; padding:12px 16px; border:1px solid #aaa; border-radius:4px; background:#222; color:#fff; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
+.btn.secondary { color:#222; background:#fff; border-color:#aaa; }
+.btn.danger { background:#222; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.actions { display:grid; gap:8px; }
+:focus-visible { outline:3px solid #956c22; outline-offset:3px; }
+[hidden] { display:none !important; }
+@media(max-width:390px) {
+  body { padding:20px 12px; }
+  .panel { padding:16px; }
+  .review > div { grid-template-columns:minmax(0,76px) minmax(0,1fr); gap:8px; }
+}
+@media(min-width:768px) { body { padding-top:48px; } }
+@media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto; } }

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <title>予約のキャンセル | pepel moco</title>
+  <link rel="stylesheet" href="cancel.css">
+  <script src="client.js" defer></script>
+  <script src="transport.js" defer></script>
+  <script src="browser.js" defer></script>
+</head>
+<body>
+<main class="container">
+  <header><p class="brand">pepel moco</p><p class="hint">テスト中</p><h1>予約のキャンセル</h1></header>
+  <noscript><p>JavaScriptを有効にして、保存したキャンセルリンクから開き直してください。</p></noscript>
+  <section class="panel" aria-labelledby="phaseTitle">
+    <h2 id="phaseTitle" tabindex="-1">予約を確認しています</h2>
+    <p id="notice" role="status" aria-live="polite" aria-atomic="true"></p>
+    <dl id="details" class="review" hidden></dl>
+    <div id="entry" hidden>
+      <label for="phone">予約時の電話番号</label>
+      <input id="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" aria-describedby="phoneHint">
+      <p id="phoneHint" class="hint">予約時に登録した電話番号を入力してください。</p>
+      <label for="reason">キャンセル理由（任意）</label>
+      <textarea id="reason" rows="3"></textarea>
+      <button id="reviewButton" class="btn" type="button" disabled>取消内容を確認</button>
+    </div>
+    <div id="confirmation" hidden>
+      <p>表示されている予約をキャンセルします。よろしいですか。</p>
+      <div class="actions"><button id="confirmButton" class="btn danger" type="button">この予約をキャンセルする</button><button id="backButton" class="btn secondary" type="button">入力に戻る</button></div>
+    </div>
+    <button id="inspectButton" class="btn secondary" type="button" hidden>予約の状態を確認</button>
+    <p id="contact" class="hint" hidden>確認できない場合は、LINEまたはお電話で店舗へご連絡ください。</p>
+  </section>
+  <p class="hint">キャンセルリンクは他の人に共有しないでください。再読込みした場合は、保存した元のリンクから開き直してください。</p>
+</main>
+</body>
+</html>

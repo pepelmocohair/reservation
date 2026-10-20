@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ご予約 | pepel moco</title>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { margin:0; padding:32px 16px; background:#f7f6f2; color:#222; font:15px/1.8 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif; }
+        .container { max-width:620px; margin:auto; }
+        header { text-align:center; padding:24px 0 40px; }
+        h1 { font-size:28px; font-weight:400; letter-spacing:.15em; margin:0; }
+        header p { font-size:12px; letter-spacing:.12em; color:#666; }
+        .form-group { margin-bottom:32px; }
+        label, .step-label { display:block; font-size:15px; margin:0 0 12px; font-weight:500; }
+        select,input,button { font:inherit; }
+        select,input { width:100%; min-height:48px; padding:12px; border:1px solid #aaa; border-radius:4px; background:#fff; color:#222; }
+        button { min-height:48px; border:1px solid #aaa; border-radius:4px; background:transparent; color:#222; cursor:pointer; }
+        button:disabled { color:#999; border-color:#ddd; cursor:default; }
+        :focus-visible { outline:2px solid #222; outline-offset:3px; }
+        .calendar { border:0; padding:0; margin:0; min-width:0; }
+        .calendar-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:16px; }
+        .calendar-heading button { padding:0 16px; }
+        .weekdays,.calendar-days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; }
+        .weekdays { text-align:center; color:#666; font-size:12px; margin-bottom:8px; }
+        .calendar-days button { padding:0; min-width:0; border-color:transparent; }
+        button.today { text-decoration:underline; text-underline-offset:5px; }
+        button[aria-pressed="true"] { background:#222; color:#fff; border-color:#222; }
+        .hint { color:#666; font-size:13px; margin:12px 0; }
+        .time-buttons { display:grid; grid-template-columns:repeat(auto-fit,minmax(76px,1fr)); gap:8px; }
+        .btn { width:100%; background:#222; color:white; padding:14px; }
+        .btn:disabled { background:#e4e2dd; color:#777; }
+        .loading { display:none; text-align:center; margin:16px 0; }
+        .notice { display:none; border-left:2px solid #666; padding:12px 16px; margin-bottom:24px; }
+        [hidden] { display:none !important; }
+        @media(min-width:768px) { body { padding:48px 24px; } .calendar-days button { min-height:56px; } }
+        .progress { font-size:13px; letter-spacing:.06em; margin:0 0 24px; color:#666; }
+        .panel { background:#fff; border:1px solid #dedbd4; border-radius:8px; padding:24px; margin-bottom:20px; }
+        .panel h2 { font-size:18px; font-weight:500; margin-top:0; }
+        .menu-card { display:block; width:100%; text-align:left; padding:18px; margin:10px 0; background:#fff; overflow-wrap:anywhere; }
+        .menu-card span { display:block; }
+        .menu-card .card-meta { font-size:14px; color:#666; margin-top:6px; }
+        .menu-card[aria-pressed="true"] { background:#f0eee7; border:2px solid #555b4f; color:#222; }
+        .menu-card[aria-pressed="true"] .card-meta { color:#444; }
+        .category-title { font-size:13px; letter-spacing:.08em; margin:24px 0 8px; color:#666; }
+        .summary { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid #dedbd4; margin-bottom:20px; }
+        .summary p { margin:0; white-space:pre-line; overflow-wrap:anywhere; }
+        .summary button { flex-shrink:0; padding:0 14px; }
+        .actions { display:flex; gap:12px; margin-top:24px; }
+        .actions button { padding:12px 18px; }
+        .actions .btn { flex:1; }
+        .review { margin:0; }
+        .review div { padding:16px 0; border-bottom:1px solid #dedbd4; }
+        .review dt { font-size:13px; color:#666; }
+        .review dd { margin:6px 0 0; overflow-wrap:anywhere; }
+        .time-context { font-weight:500; margin-top:28px; }
+        @media(max-width:420px) { body { padding:20px 12px; } .panel { padding:16px 10px; } .calendar-days { gap:2px; } }
+        .menu-dock { position:fixed; z-index:30; left:0; right:0; bottom:0; padding:12px max(16px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)); background:#f7f6f2; border-top:1px solid #dedbd4; }
+        .menu-dock-inner { max-width:620px; margin:auto; }
+        .menu-dock .hint { margin:0 0 8px; overflow-wrap:anywhere; }
+        #menuPanel { margin-bottom:200px; }
+        .schedule-scroll { overflow:auto; max-height:60vh; border:1px solid #ccc; margin:16px 0; }
+        .schedule { border-collapse:separate; border-spacing:0; width:100%; min-width:460px; table-layout:fixed; font-size:12px; }
+        .schedule th,.schedule td { padding:0; text-align:center; border-right:1px solid #ccc; border-bottom:1px solid #ccc; height:44px; }
+        .schedule th { background:#f7f6f2; font-weight:400; }
+        .schedule thead th { position:sticky; top:0; z-index:3; white-space:pre-line; }
+        .schedule th:first-child { position:sticky; left:0; width:52px; z-index:2; }
+        .schedule thead th:first-child { z-index:4; }
+        .schedule button { width:100%; height:44px; min-height:44px; padding:0; line-height:1; border:0; border-radius:0; font-size:23px; color:#49665b; background:white; }
+        .schedule button[aria-pressed="true"] { background:#dbe5dd; color:#222; box-shadow:inset 0 0 0 3px #49665b; }
+        .schedule-date, .schedule-weekday { display:block; }
+        .schedule thead th.saturday { color:#2459a6; }
+        .schedule thead th.sunday { color:#b42323; }
+        .schedule .unavailable { background:#292929; color:#fff; }
+        .schedule .unknown { background:#f0eee7; color:#666; }
+        .schedule button:focus-visible { outline-offset:-4px; }
+        .week-nav { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+        .week-nav button { padding:0 12px; }
+        /* Mobile-first booking: compact context and persistent next action. */
+        header { padding:4px 0 16px; }
+        header p { margin:2px 0 0; }
+        .steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; list-style:none; padding:0; margin:0 0 16px; font-size:12px; }
+        .steps li { text-align:center; padding:8px 2px; border-bottom:3px solid #dedbd4; color:#666; }
+        .steps li[aria-current="step"] { color:#234f43; border-color:#234f43; font-weight:700; background:#eaf2ee; }
+        .progress { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); }
+        .menu-loading { padding:40px 14px; font-size:20px; font-weight:500; text-align:center; }
+        .menu-loading p { margin:0; }
+        .menu-card { padding:12px 14px; margin:8px 0; border-radius:6px; }
+        .menu-card .card-meta { margin-top:2px; }
+        .category-title { margin:16px 0 6px; }
+        .summary { padding:10px 0; margin-bottom:12px; gap:8px; font-size:14px; }
+        .summary button { font-size:12px; padding:0 8px; }
+        .btn { background:#234f43; border-color:#234f43; font-weight:600; }
+        .menu-card[aria-pressed="true"] { border-color:#234f43; background:#eaf2ee; }
+        .schedule button[aria-pressed="true"] { background:#234f43; color:#fff; box-shadow:inset 0 0 0 3px #17372e; }
+        .schedule button:disabled { color:#49665b; }
+        .schedule button[aria-pressed="true"]:disabled { color:#fff; }
+        .schedule-scroll { overscroll-behavior:contain; }
+        .menu-dock .hint { max-height:54px; overflow:auto; }
+        #menuPanel { margin-bottom:150px; }
+        @media(max-width:360px) { .steps { font-size:10px; } }
+        @media(max-width:767px) {
+            body { padding:12px 10px; }
+            h1 { font-size:22px; }
+            header { padding:0 0 12px; }
+            header p { font-size:10px; }
+            .panel { padding:14px 0; border:0; border-radius:0; background:transparent; margin-bottom:130px; }
+            .panel h2 { margin-bottom:8px; }
+            #datePanel .form-group { margin-bottom:12px; }
+            .hint { margin:8px 0; font-size:12px; }
+            .schedule-scroll { margin:12px -10px; max-height:58vh; }
+            .schedule { min-width:360px; }
+            .schedule th:first-child { width:44px; }
+            .week-nav button { padding:0 8px; font-size:12px; }
+            .week-nav span { font-size:13px; white-space:nowrap; }
+            .actions, .date-dock { position:fixed; z-index:30; left:0; right:0; bottom:0; margin:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid #dedbd4; background:#f7f6f2; }
+            .actions { gap:8px; }
+            .actions button { padding:10px; font-size:13px; }
+            .date-dock .hint { margin:0 0 6px; }
+            #customerPanel label { margin:14px 0 6px; }
+            .review div { padding:10px 0; }
+        }
+
+        /* The date step gives the weekly calendar the first screen. */
+        #bookingForm[data-step="date"] .steps { margin-bottom:4px; }
+        #bookingForm[data-step="date"] .steps li { padding:4px 2px; }
+        #bookingForm[data-step="date"] .summary { padding:0; margin:0; border:0; line-height:1.4; }
+        #bookingForm[data-step="date"] .summary button { min-height:44px; border:0; text-decoration:underline; }
+        #dateLabel, #timeStatus { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); margin:0; }
+        #datePanel { padding-top:0; }
+        @media(min-width:768px) { body:has(#bookingForm[data-step="date"]) { padding-top:8px; } }
+        .week-nav { height:44px; }
+        .week-nav button { min-width:44px; min-height:44px; padding:0; font-size:28px; border:0; }
+        #weekStatus:empty { display:none; }
+        .schedule-scroll { position:relative; height: min(650px, calc(100dvh - 260px)); max-height:none; margin:0; }
+        .schedule { min-width:0; }
+        .schedule th:first-child { width:44px; }
+        .schedule thead th { height:36px; line-height:1.3; }
+        .schedule th,.schedule td { height:36px; }
+        .schedule button { height:36px; min-height:36px; font-size:23px; }
+        .calendar-loading { position:absolute; inset:36px 0 0; z-index:5; display:flex; align-items:center; justify-content:center; flex-direction:column; background:rgba(247,246,242,.94); font-size:18px; text-align:center; line-height:1.6; pointer-events:all; }
+        .spinner { width:24px; height:24px; border:3px solid #dedbd4; border-top-color:#234f43; border-radius:50%; animation:spin 1s linear infinite; margin-bottom:12px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @media(prefers-reduced-motion:reduce) { .spinner { animation:none; } }
+        @media(max-width:767px) {
+            #datePanel .schedule-scroll { margin:0 -10px; height:calc(100dvh - 240px); }
+            #datePanel .schedule { min-width:320px; }
+            #datePanel .date-dock { padding:6px 12px calc(6px + env(safe-area-inset-bottom)); }
+            #datePanel .date-dock .btn { min-height:44px; padding:8px; }
+        }
+        #customerPanel textarea { font:inherit; font-size:16px; width:100%; min-height:80px; padding:10px; border:1px solid #aaa; border-radius:4px; background:#fff; color:#222; resize:vertical; }
+        .cancel-policy { margin-top:24px; }
+        .cancel-policy h3 { font-size:16px; margin:0 0 8px; }
+        .cancel-policy p { margin:0 0 12px; }
+        #customerPanel .policy-check { display:flex; align-items:center; gap:10px; min-height:48px; cursor:pointer; }
+        #customerPanel .policy-check input { flex:0 0 22px; width:22px; height:22px; min-height:22px; padding:0; accent-color:#234f43; }
+        #reviewDetails dd { white-space:pre-wrap; }
+        .dev-banner { margin:6px 0 0; padding:4px 10px; border-radius:99px; background:#fff4d6; color:#6b4a00; font-size:12px; display:inline-block; }
+        .uncertain-notice:not([hidden]) { display:block; background:#fff4d6; border-color:#d9a400; color:#4a3500; }
+        .conditions:not([hidden]) { display:grid; gap:10px; margin:0 0 14px; padding:12px; border:1px solid #d9d4c7; border-radius:8px; background:#fff; }
+        .conditions .conditions-title { margin:0; font-weight:600; }
+        .conditions label { display:grid; gap:4px; }
+        .conditions select { font-size:16px; min-height:44px; }
+        .conditions fieldset { border:0; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px 16px; }
+        .conditions legend { padding:0; margin-bottom:4px; }
+        .conditions fieldset label { display:flex; align-items:center; gap:6px; min-height:44px; }
+        .schedule td.waiting { background:#f2efe8; }
+        .visit-question .visit-options { display:grid; gap:10px; margin:0 0 14px; }
+        #menuPanel[data-visit="ask"] #menuHeading, #menuPanel[data-visit="ask"] #menuCards, #menuPanel[data-visit="ask"] #toDate { display:none; }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <header><h1>pepel moco</h1><p>RESERVATION / ご予約</p><p class="dev-banner">テスト中</p></header>
+
+    <div id="bookingForm">
+    <div id="notice" class="notice" role="status" aria-live="polite"></div>
+    <div id="uncertainNotice" class="notice uncertain-notice" role="alert" hidden></div>
+
+
+    <p class="progress" id="flowProgress" role="status">1 / 4　メニュー</p>
+    <ol id="flowSteps" class="steps" aria-label="予約の手順"><li id="step-menu" aria-current="step">1 メニュー</li><li id="step-date">2 日時</li><li id="step-customer">3 お客様情報</li><li id="step-review">4 確認</li></ol>
+    <div id="menuSummary" class="summary" hidden><p id="menuSummaryText"></p><button id="editMenu" type="button">メニュー変更</button></div>
+    <div id="dateSummary" class="summary" hidden><p id="dateSummaryText"></p><button id="editDate" type="button">日時変更</button></div>
+    <div id="menuPanel">
+        <div id="visitPanel" class="visit-question" hidden>
+            <p id="visitHeading" class="step-label" tabindex="-1">pepel mocoで施術を受けたことはありますか？</p>
+            <div class="visit-options" role="group" aria-labelledby="visitHeading">
+                <button type="button" class="btn visit-card" data-visit-choice="first">はじめて</button>
+                <button type="button" class="btn visit-card" data-visit-choice="returning">担当してもらったことがある</button>
+            </div>
+        </div>
+        <div id="visitSummary" class="summary" hidden><p id="visitSummaryText"></p><button id="editVisit" type="button">ご来店経験を変更</button></div>
+        <p id="menuHeading" class="hint" tabindex="-1">ご希望のメニューを選択してください（複数選択可）。もう一度押すと解除できます。</p>
+        <select id="menu" hidden disabled aria-label="メニュー"><option value="">メニューを読み込み中...</option></select>
+        <div id="menuLoading" class="menu-loading" role="status"><p>メニューを読み込んでいます…</p></div>
+        <button id="retryMenus" type="button" hidden>メニューを再取得</button>
+        <div id="menuCards" role="group" aria-labelledby="menuHeading"></div>
+        <div class="menu-dock" id="menuDock"><div class="menu-dock-inner">
+        <p id="menuDetails" class="hint" aria-live="polite">メニューを読み込み中...</p>
+        <button class="btn" id="toDate" type="button" disabled>日時を選ぶ</button>
+        </div></div>
+    </div>
+    <section class="panel" id="datePanel" aria-labelledby="dateLabel" hidden>
+        <h2 class="step-label" id="dateLabel" tabindex="-1">週間の空き状況</h2>
+    <div hidden>
+        <input type="hidden" id="date">
+        <fieldset class="calendar" id="calendar" aria-labelledby="dateLabel" disabled>
+            <div class="calendar-heading">
+                <button type="button" id="prevMonth" aria-label="前の月">前月</button>
+                <span id="monthLabel" aria-live="polite"></span>
+                <button type="button" id="nextMonth" aria-label="次の月">次月</button>
+            </div>
+            <div class="weekdays" aria-hidden="true"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+            <div class="calendar-days" id="calendarDays"></div>
+        </fieldset>
+        <p class="hint" id="selectedDate" aria-live="polite">メニューを選択してから日付を選んでください。</p>
+        <p class="hint">休業日・空き状況は日付を選択すると確認できます。</p>
+    </div>
+    <div class="form-group">
+        <p id="timeContext" hidden></p>
+        <select id="time" hidden disabled aria-hidden="true"><option value=""></option></select>
+        <p id="timeStatus" class="hint" role="status"></p>
+        <div id="timeButtons" class="time-buttons" role="group" aria-label="予約可能時間" hidden></div>
+        <div id="conditionsPanel" class="conditions" hidden></div>
+        <div class="week-nav"><button id="prevWeek" type="button" aria-label="前の週">‹</button><span id="weekLabel"></span><button id="nextWeek" type="button" aria-label="次の週">›</button></div>
+        <p id="weekStatus" class="hint" role="status"></p>
+        <button id="retryWeek" type="button" hidden>空き状況を再取得</button>
+        <div id="calendarRegion" class="schedule-scroll" tabindex="0" role="region" aria-label="7日間の予約可能時間"><table id="schedule" class="schedule" aria-label="予約可能時間一覧"></table><div id="calendarLoading" class="calendar-loading" role="status" hidden><span class="spinner" aria-hidden="true"></span><span>空き状況を<br>読み込んでいます…</span></div></div>
+    </div>
+
+        <div class="date-dock"><p id="selectionStatus" class="hint" role="status" aria-live="polite">◎から開始時刻を選択（黒は予約不可）</p><button class="btn" id="toCustomer" type="button" aria-live="polite" aria-atomic="true" disabled>お客様情報へ</button></div>
+    </section>
+    <section class="panel" id="customerPanel" aria-labelledby="customerHeading" hidden>
+        <h2 id="customerHeading" tabindex="-1">お客様情報</h2>
+        <label for="name">お名前（フルネーム）</label>
+        <input type="text" id="name" autocomplete="name" placeholder="山田 太郎" required>
+        <label for="phone">電話番号（必須）</label>
+        <input type="tel" id="phone" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="090-1234-5678" aria-describedby="phoneHint" required>
+        <p id="phoneHint" class="hint">国内の電話番号を入力してください。ハイフンあり・なし、どちらでも入力できます。</p>
+        <label for="customerRequests">メッセージ・ご要望があればどうぞ（任意）</label>
+        <textarea id="customerRequests" rows="2" maxlength="100"></textarea>
+        <section class="cancel-policy" aria-labelledby="cancelPolicyHeading">
+            <h3 id="cancelPolicyHeading">キャンセルについて</h3>
+            <p id="cancelPolicyText">変更・キャンセルは、できるだけ早めにご連絡をお願いいたします。<br>当日のキャンセルや大幅な遅刻の場合は、LINEまたはお電話にてご連絡ください。<br><br>ご連絡なく来店されなかった場合は、施術料金の100％をキャンセル料としてお願いする場合がございます。<br>また、以降のご予約をお受けできない場合がございます。</p>
+            <label class="policy-check" for="cancelPolicy"><input id="cancelPolicy" type="checkbox" aria-describedby="cancelPolicyText" required><span>キャンセルポリシーを確認しました</span></label>
+        </section>
+        <div class="actions"><button id="backDate" type="button">日時へ戻る</button><button class="btn" id="reviewBtn" type="button" disabled>予約内容を確認する</button></div>
+    </section>
+    <section class="panel" id="reviewPanel" aria-labelledby="reviewHeading" hidden>
+        <h2 id="reviewHeading" tabindex="-1">予約内容の確認</h2>
+        <dl class="review" id="reviewDetails"></dl>
+        <p class="hint">内容をご確認のうえ、予約を確定してください。料金はメニュー掲載時の表記です。</p>
+        <div class="actions"><button id="backCustomer" type="button">お客様情報を修正</button><button class="btn" id="submitBtn" type="button" disabled>予約を確定する</button></div>
+    </section>
+    <div class="loading" id="loadingMsg" role="status">予約を送信中...</div>
+
+    </div>
+    <section id="completedPanel" class="panel" aria-labelledby="completedHeading" hidden>
+        <h2 id="completedHeading" tabindex="-1">ご予約を承りました。</h2>
+        <dl id="completedDetails" class="review"></dl>
+        <a id="cancelLink" hidden>予約をキャンセルする</a>
+        <p id="cancelLinkHint" class="hint" hidden>キャンセルが必要な場合に備え、このリンクを保存してください。リンクは他の人に共有しないでください。</p>
+        <p>予約手続きは完了しました。この画面は閉じていただいて大丈夫です。</p>
+    </section>
+    <section id="cancelPanel" class="panel" aria-labelledby="cancelHeading" hidden>
+        <h2 id="cancelHeading" tabindex="-1">予約のキャンセル</h2>
+        <dl id="cancelDetails" class="review"></dl>
+        <p id="cancelNotice" role="status" aria-live="polite"></p>
+        <div id="cancelControls" hidden>
+            <label for="cancelPhone">予約時の電話番号</label>
+            <input id="cancelPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" required>
+            <p class="hint">対象の予約内容をご確認ください。「キャンセルする」を押すと予約が取り消されます。</p>
+            <button id="cancelSubmit" class="btn" type="button" disabled>キャンセルする</button>
+        </div>
+    </section>
+</div>
+
+
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
+<script>
+
+// ==================================================
+// GAS URL
+// ==================================================
+
+// Customer WEB booking: connection adapter (inlined at the top of the page script by build.cjs).
+// Every API call of the page goes through PepelBookingApi.fetch(). Only requests of the customer
+// contract (web-booking/CUSTOMER_CONTRACT.md) pass: the existing GET/cancel calls, the 2B create body
+// with its requestId/resumeProof, the D01 conditions, and the v44 inspect/abandon receipt calls.
+// Anything else is refused before it is sent. The adapter never adds fields, retries or writes.
+// Transports: 'http' (fetch) for static hosts, or 'gas' (google.script.run) when hosted by GAS.
+const PEPEL_BOOKING_CONFIG = {"transport":"http","apiBase":"https://script.google.com/macros/s/AKfycbwdeG03XknIH_bakpU91_Yc0KjH-q12EE1sa0oOtPVlfgzRIGGweUr4j3iAUttXyzYYqw/exec","startIntervalMinutes":30,"cancelPage":"/reservation/line-test/cancel/","cancelLinkTarget":null,"requireLineToken":true};
+const PepelBookingApi = (function(config) {
+    // visitExperience: the booking entrance answer (はじめて / 担当してもらったことがある), see booking_v3.js.
+    const CONDITIONS = ['attributes','consultationContentChanged','visitExperience'];
+    const GET = {menus:['visitExperience'], availability:['date','menuId','menuIds',...CONDITIONS], availabilityWeek:['startDate','menuId','menuIds','dates',...CONDITIONS]};
+    const CREATE = ['sourceType','requestVersion','requestId','resumeProof','menuId','menuIds','date','time','name','phone','customerRequests',...CONDITIONS,'confirmation','lineIdToken'];
+    const RECEIPT = ['sourceType','action','requestId','resumeProof'];
+    const POST = {inspect:RECEIPT, abandon:RECEIPT, cancelPreview:['sourceType','action','reservationId','cancelToken'], cancelReservation:['sourceType','action','reservationId','cancelToken','phone','reason']};
+    const ID = /^[A-Za-z0-9_-]{22,128}$/;
+    const violation = reason => Object.assign(new Error('contract_violation:' + reason), {contractViolation:true});
+    function only(keys, allowed, label) { const extra = keys.filter(key => !allowed.includes(key)); if (extra.length) throw violation(label + ':' + extra.join(',')); }
+    function describe(url, options = {}) {
+        if (typeof config.apiBase !== 'string' || !config.apiBase) throw violation('api_base_missing');
+        const text = String(url);
+        if (text !== config.apiBase && !text.startsWith(config.apiBase + '?')) throw violation('foreign_url');
+        const method = (options.method || 'GET').toUpperCase();
+        const params = Object.fromEntries(new URLSearchParams(text.slice(config.apiBase.length + 1)));
+        if (method === 'GET') {
+            if (options.body !== undefined) throw violation('get_body');
+            if (!Object.hasOwn(GET, params.action)) throw violation('get_action');
+            only(Object.keys(params).filter(key => key !== 'action'), GET[params.action], 'get_params');
+            if (params.menuId !== undefined && params.menuIds !== undefined) throw violation('menu_both');
+            return {method, action:params.action, params};
+        }
+        if (method !== 'POST' || Object.keys(params).length) throw violation('method');
+        let body;
+        try { body = JSON.parse(options.body); } catch (_) { throw violation('post_json'); }
+        if (!body || typeof body !== 'object' || Array.isArray(body) || body.sourceType !== 'WEB_PAGE') throw violation('post_source');
+        if (body.action === undefined) {
+            only(Object.keys(body), CREATE, 'create_keys');
+            if (body.requestVersion !== 2) throw violation('request_version');
+            if (!ID.test(body.requestId || '') || !ID.test(body.resumeProof || '')) throw violation('request_identity');
+            const c = body.confirmation;
+            if (!c || typeof c !== 'object' || Object.keys(c).sort().join() !== 'certainty,finalDurationMinutes,totalMaxYen,totalMinYen') throw violation('confirmation');
+            return {method, action:'create', body};
+        }
+        if (!Object.hasOwn(POST, body.action)) throw violation('post_action');
+        only(Object.keys(body), POST[body.action], 'post_keys');
+        if (POST[body.action] === RECEIPT && (!ID.test(body.requestId || '') || !ID.test(body.resumeProof || ''))) throw violation('request_identity');
+        return {method, action:body.action, body};
+    }
+    const transports = {
+        http: (request, url, options) => fetch(url, options),
+        gas: request => new Promise((resolve,reject) => {
+            if(typeof google==='undefined' || !google.script || !google.script.run) return reject(violation('gas_bridge_unavailable'));
+            const runner=google.script.run
+                .withSuccessHandler(data=>resolve({ok:true,json:async()=>data}))
+                .withFailureHandler(()=>reject(new Error('customer_api_unavailable')));
+            if(request.method==='GET') runner.customerGet(request.params);
+            else runner.customerPost(JSON.stringify(request.body));
+        })
+    };
+    return Object.freeze({
+        config: Object.freeze({...config}),
+        describe,
+        fetch(url, options = {}) {
+            let request;
+            try { request = describe(url, options); } catch (error) { return Promise.reject(error); }
+            const transport = transports[config.transport];
+            if (!transport) return Promise.reject(violation('transport'));
+            // LIFF (build option liffId): wait for LIFF, then send the LINE ID token only in POST bodies —
+            // with the create request, and availability as POST — never in a URL. The server verifies it.
+            const line = typeof PepelLine !== 'undefined' ? PepelLine : null;
+            return (line && line.ready ? line.ready : Promise.resolve()).then(() => {
+                const token = line && line.idToken;
+                if (config.requireLineToken && (typeof token !== 'string' || !token)) throw violation('line_auth_required');
+                if (token && request.method === 'GET' && ['menus','availability','availabilityWeek'].includes(request.action)) {
+                    const body = {sourceType:'WEB_PAGE', ...request.params, lineIdToken:token};
+                    request = {method:'POST', action:request.action, body};
+                    options = {method:'POST', body:JSON.stringify(body), ...(options.signal ? {signal:options.signal} : {})};
+                    url = config.apiBase;
+                } else if (token && request.action === 'create') {
+                    request = {...request, body:{...request.body, lineIdToken:token}};
+                    options = {...options, body:JSON.stringify(request.body)};
+                }
+                return transport(request, url, options);
+            });
+        }
+    });
+})(PEPEL_BOOKING_CONFIG);
+
+// Customer WEB booking additions (inlined after the adapter by build.cjs; uses the page's globals).
+// IP-2 2D (front request ID and outcome inquiry) and 3E (conditions and server results):
+//   - Prices and durations shown are the common evaluation engine's results returned by the API
+//     (never a local sum of master values). A selection that the engine cannot price or time is not
+//     bookable from this page.
+//   - Required conditions (hair length, henna range, school year, lightening method, perm areas,
+//     "content changed since the consultation") are asked only when the engine reports them missing.
+//     Evidence the customer cannot supply (history, approvals) sends the customer to the store.
+//   - Every booking carries a high-entropy requestId and resumeProof fixed at review time. They stay
+//     in memory and, only while the outcome is unknown, in this browser's storage (never in the URL
+//     or on screen). A lost response is settled with the same requestId: inspect a few times, then
+//     abandon (v44): the server either returns the receipt (saved) or fences the request so it can
+//     never commit (not saved). The booking POST is never sent again automatically.
+const CONDITION_FIELDS = {
+    hairLength: {label:'髪の長さ', options:[['S','ショート（顎まで）'],['M','ミディアム（顎より下〜鎖骨まで）'],['L','ロング（鎖骨より下）']]},
+    hennaRange: {label:'ヘナを染める範囲', options:[['roots','根元のみ'],['roots_and_ends','根元と毛先']]},
+    schoolStage: {label:'お子さまの学年', options:[['preschool','未就学'],['primary_1','小学1年'],['primary_2','小学2年'],['primary_3','小学3年'],['primary_4','小学4年'],['primary_5','小学5年'],['primary_6','小学6年'],['other','それ以外']]},
+    lighteningMethod: {label:'明るくする方法', options:[['full_bleach','全体ブリーチ'],['highlights','ハイライト']]}
+};
+const PERM_PARTS = [['fringe','前髪'],['top','トップ']];
+const REASON_TEXT = {
+    full_cut_experience_within_year_required:'当店でのフルカットから2年以内の方が対象のメニューです。',
+    henna_experience_required:'当店でヘナ染めをされたことがある方が対象のメニューです。',
+    prior_consultation_required:'事前のご相談と店舗の了承が必要なメニューです。LINEまたはお電話でご相談ください。',
+    excluded_combination:'この組み合わせは同時にご予約いただけません。メニューを選び直してください。'
+};
+const STORE_CHECK_TEXT = 'ご予約の条件を店舗で確認する必要があります。LINEまたはお電話でお問い合わせください。';
+const TOTAL_NOT_FIXED_TEXT = 'この組み合わせは料金がご来店時に確定するため、現在WEBではご予約いただけません。LINEまたはお電話でお問い合わせください。';
+const NOT_BOOKABLE_TEXT = 'ご選択の内容は、WEBではご予約いただけません。LINEまたはお電話でお問い合わせください。';
+const BOOKABLE_STATES = ['ready_for_time_selection','allowed'];
+const conditions = {attributes:{}, consultationContentChanged:null};
+let shownConditionFields = [];
+let checkedEvaluation = null;
+// Booking entrance (owner decision 2026-10-19): a first-time user of this system answers before the
+// menus; the server returns the menus, prices, counseling and durations of that category. A verified
+// identity with a stored profile (LINE) is not asked: the server reports its category (visitExperienceKnown).
+const VISIT_LABEL = {first:'はじめて', returning:'担当してもらったことがある'};
+let visitExperience = null, visitAsked = false;
+function visitQuery() { return visitExperience ? '&visitExperience=' + visitExperience : ''; }
+function acceptVisit(data) {
+    if (data.visitExperienceKnown === true && Object.hasOwn(VISIT_LABEL, data.visitExperience)) { visitExperience = data.visitExperience; visitAsked = false; renderVisit(false); return true; }
+    if (data.askVisitExperience === true && !visitExperience) { renderVisit(true); return false; }
+    renderVisit(false); return true;
+}
+function renderVisit(ask) {
+    document.getElementById('visitPanel').hidden = !ask;
+    document.getElementById('menuPanel').setAttribute('data-visit', ask ? 'ask' : 'answered');
+    document.getElementById('visitSummary').hidden = ask || !visitAsked;
+    document.getElementById('visitSummaryText').textContent = visitAsked && visitExperience ? 'ご来店：' + VISIT_LABEL[visitExperience] : '';
+    if (ask) menuDetails.textContent = 'はじめに、ご来店経験を選んでください。';
+}
+function chooseVisit(value) {
+    if (!Object.hasOwn(VISIT_LABEL, value) || submitting || completed) return;
+    visitExperience = value; visitAsked = true;
+    menuSelect.value = ''; resetConditions(); invalidateWeek();
+    loadMenus();
+}
+function editVisit() {
+    if (submitting || completed) return;
+    visitExperience = null; visitAsked = false;
+    menuSelect.value = ''; resetConditions(); invalidateWeek(); menus = [];
+    renderMenuCards(); renderVisit(true); renderFlow();
+    document.getElementById('visitHeading').focus();
+}
+if (typeof document !== 'undefined') document.addEventListener('click', event => {
+    const choice = event.target.closest && event.target.closest('[data-visit-choice]');
+    if (choice) chooseVisit(choice.getAttribute('data-visit-choice'));
+    else if (event.target.id === 'editVisit') editVisit();
+});
+function conditionQuery() {
+    return visitQuery() + (Object.keys(conditions.attributes).length ? '&attributes=' + encodeURIComponent(JSON.stringify(conditions.attributes)) : '') +
+        (conditions.consultationContentChanged === null ? '' : '&consultationContentChanged=' + conditions.consultationContentChanged);
+}
+function conditionsKey() { return JSON.stringify([conditions.attributes, conditions.consultationContentChanged, visitExperience]); }
+function resetConditions() { conditions.attributes = {}; conditions.consultationContentChanged = null; shownConditionFields = []; }
+function validEvaluation(e) {
+    return !!e && typeof e === 'object' && typeof e.state === 'string' && Array.isArray(e.missingInformation) && Array.isArray(e.reasons) &&
+        Array.isArray(e.effectiveMenuIds) && (e.pricing === null || (typeof e.pricing === 'object' && Array.isArray(e.pricing.entries) && !!e.pricing.total)) &&
+        (e.duration === null || (typeof e.duration === 'object' && Number.isSafeInteger(e.duration.finalDurationMinutes)));
+}
+function evaluationReady(e = checkedEvaluation) {
+    return !!e && BOOKABLE_STATES.includes(e.state) && !!e.pricing && !!e.duration && e.duration.finalDurationMinutes > 0;
+}
+function menuName(id) { const m = menus.find(item => item.id === id); return m ? m.name : 'メニュー'; }
+function yen(n) { return '¥' + Math.abs(n).toLocaleString('ja-JP'); }
+function priceText(min, max, certainty) {
+    if (!Number.isSafeInteger(min)) return null;
+    return certainty === 'exact' && max === min ? yen(min) : yen(min) + '〜';
+}
+function totalText(e) {
+    const t = e.pricing.total, text = priceText(t.minimumYen, t.maximumYen, t.certainty);
+    return text ? text + (t.certainty === 'exact' ? '' : '（概算）') : 'ご来店時に確定';
+}
+function priceLines(e) {
+    const p = e.pricing, lines = p.entries.map(x => menuName(x.menuId) + '　' + (priceText(x.minimumYen, x.maximumYen, x.certainty) || '店舗で確認'));
+    if (p.discount.status === 'confirmed' && p.discount.amountYen > 0) lines.push('セット割引　−' + yen(p.discount.amountYen));
+    else if (p.discount.status === 'pending_amount') lines.push('セット割引　対象（金額はご来店時に確定）');
+    if (p.counselingFeeYen > 0) lines.push('カウンセリング料　' + yen(p.counselingFeeYen));
+    if (p.adjustmentYen) lines.push('料金調整　' + (p.adjustmentYen < 0 ? '−' : '＋') + yen(p.adjustmentYen));
+    lines.push('合計　' + totalText(e));
+    return lines;
+}
+function durationText(e) {
+    const d = e.duration;
+    return d.finalDurationMinutes + '分' + (d.counselingMinutes > 0 ? '（施術' + d.treatmentMinutes + '分＋カウンセリング' + d.counselingMinutes + '分）' : '');
+}
+function endTimeOf(time, e) {
+    const m = Number(time.slice(0,2)) * 60 + Number(time.slice(3)) + e.duration.finalDurationMinutes;
+    return String(Math.floor(m / 60)).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0');
+}
+// Before a date is chosen, the week's evaluation is shown only when every day agrees.
+function uniformWeekText() {
+    const texts = [...new Set(weekDays.filter(day => day.date >= dateInput.min && day.data && evaluationReady(day.data.evaluation))
+        .map(day => totalText(day.data.evaluation) + ' / ' + durationText(day.data.evaluation)))];
+    return texts.length === 1 ? texts[0] : null;
+}
+function evaluationSummary() {
+    return evaluationReady() ? totalText(checkedEvaluation) + ' / ' + durationText(checkedEvaluation) : uniformWeekText() || '料金・所要時間は日時を選ぶと表示されます';
+}
+function fieldOf(code) {
+    const m = /^attributes\.(hairLength|hennaRange|schoolStage|lighteningMethod)$/.exec(code);
+    if (m) return m[1];
+    const p = /^attributes\.permAreas\.([A-Za-z0-9]+)(?:\.canonicalParts)?$/.exec(code);
+    if (p) return 'permAreas:' + p[1];
+    return code === 'consultationContentChanged.customer_explicit' ? 'consultation' : null;
+}
+function evaluationsShown() {
+    return [...weekDays.filter(day => day.data && day.data.evaluation && day.date >= dateInput.min).map(day => day.data.evaluation), ...(checkedEvaluation ? [checkedEvaluation] : [])];
+}
+function evaluationMessage(e) {
+    if (e.state === 'needs_information') return e.missingInformation.some(code => !fieldOf(code)) ? STORE_CHECK_TEXT : 'ご希望の条件を選択してください。';
+    const known = e.reasons.map(code => REASON_TEXT[code]).filter(Boolean);
+    return known.length ? known.join('') : NOT_BOOKABLE_TEXT;
+}
+// Shown in the week status only when no day can be booked for a condition/eligibility reason.
+function weekConditionMessage() {
+    if (weekDays.some(day => day.data && day.data.bookingAvailable === false && day.date >= dateInput.min)) return TOTAL_NOT_FIXED_TEXT;
+    const list = evaluationsShown().filter(e => !BOOKABLE_STATES.includes(e.state) && !(e.state === 'unavailable' && e.reasons.every(code => code === 'closed')));
+    return list.length ? evaluationMessage(list[0]) : '';
+}
+function changeCondition(update) {
+    if (submitting || completed) return;
+    update();
+    requestId++;
+    if (availabilityController) availabilityController.abort();
+    const start = weekStart;
+    invalidateWeek(); dateInput.value = ''; resetTimes('日時を選択してください');
+    weekStart = start; renderFlow(); loadWeek();
+}
+function renderConditions() {
+    const panel = document.getElementById('conditionsPanel');
+    const missing = evaluationsShown().flatMap(e => e.missingInformation);
+    for (const field of missing.map(fieldOf).filter(Boolean)) if (!shownConditionFields.includes(field)) shownConditionFields.push(field);
+    const storeOnly = missing.some(code => !fieldOf(code));
+    panel.hidden = !shownConditionFields.length && !storeOnly;
+    const key = JSON.stringify([shownConditionFields, storeOnly]);
+    if (panel.dataset.key === key) return;
+    panel.dataset.key = key; panel.replaceChildren();
+    const title = document.createElement('p'); title.className = 'conditions-title';
+    title.textContent = shownConditionFields.length ? 'ご予約内容の確認に必要な項目です。' : '';
+    panel.appendChild(title);
+    for (const field of shownConditionFields) {
+        if (CONDITION_FIELDS[field]) {
+            const def = CONDITION_FIELDS[field], label = document.createElement('label'), select = document.createElement('select');
+            label.textContent = def.label; select.id = 'condition-' + field;
+            select.appendChild(new Option('選択してください', ''));
+            def.options.forEach(([value, text]) => select.appendChild(new Option(text, value)));
+            select.value = conditions.attributes[field] || '';
+            select.addEventListener('change', () => changeCondition(() => {
+                if (select.value) conditions.attributes[field] = select.value; else delete conditions.attributes[field];
+            }));
+            label.appendChild(select); panel.appendChild(label);
+        } else if (field.startsWith('permAreas:')) {
+            const id = field.slice(10), group = document.createElement('fieldset'), legend = document.createElement('legend');
+            legend.textContent = menuName(id) + 'をかける部位'; group.appendChild(legend);
+            PERM_PARTS.forEach(([value, text]) => {
+                const label = document.createElement('label'), box = document.createElement('input');
+                box.type = 'checkbox'; box.value = value; box.checked = (conditions.attributes.permAreas?.[id] || []).includes(value);
+                box.addEventListener('change', () => changeCondition(() => {
+                    const areas = {...(conditions.attributes.permAreas || {})};
+                    const parts = PERM_PARTS.map(([v]) => v).filter(v => v === value ? box.checked : (areas[id] || []).includes(v));
+                    if (parts.length) areas[id] = parts; else delete areas[id];
+                    if (Object.keys(areas).length) conditions.attributes.permAreas = areas; else delete conditions.attributes.permAreas;
+                }));
+                label.appendChild(box); label.appendChild(document.createTextNode(text)); group.appendChild(label);
+            });
+            panel.appendChild(group);
+        } else if (field === 'consultation') {
+            const group = document.createElement('fieldset'), legend = document.createElement('legend');
+            legend.textContent = 'ご相談・了承いただいた内容から、髪の状態やご希望に変更はありますか';
+            group.appendChild(legend);
+            [[false,'変更はありません'],[true,'変更があります']].forEach(([value, text]) => {
+                const label = document.createElement('label'), radio = document.createElement('input');
+                radio.type = 'radio'; radio.name = 'consultationChanged'; radio.checked = conditions.consultationContentChanged === value;
+                radio.addEventListener('change', () => changeCondition(() => { conditions.consultationContentChanged = value; }));
+                label.appendChild(radio); label.appendChild(document.createTextNode(text)); group.appendChild(label);
+            });
+            panel.appendChild(group);
+        }
+    }
+    if (storeOnly) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = STORE_CHECK_TEXT; panel.appendChild(p); }
+}
+
+// ---- request ID, outcome inquiry ----
+const PENDING_KEY = 'pepel-web-booking-pending-v1';
+const UNCERTAIN = ['operation_not_found','not_submitted','outcome_unknown','operation_incomplete','transaction_contention','aborted','busy',
+    'inspect_before_recovery','abandon_unavailable','operation_recovering'];
+const uncertainResult = r => !r || (r.status !== 'success' && (UNCERTAIN.includes(r.status) || /^firestore_http_/.test(r.status || '')));
+function settleDelays() { return window.__settleDelaysMs || [1000, 3000, 6000, 10000]; }
+function settleRetryMs() { return window.__settleRetryMs || 15000; }
+let bookingRequest = null; // {requestId, resumeProof, key}
+function randomId() {
+    const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function rememberPending(p) { try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch (_) {} }
+function forgetPending() { try { localStorage.removeItem(PENDING_KEY); } catch (_) {} }
+function readPending() { try { const p = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null'); return p && typeof p.requestId === 'string' ? p : null; } catch (_) { return null; } }
+// null = the result could not be read (timeout, network, cut response). Contract violations throw.
+async function callBooking(body) {
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000);
+    try {
+        const response = await PepelBookingApi.fetch(GAS_WEB_APP_URL, {method:'POST', body:JSON.stringify(body), signal:controller.signal});
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data && typeof data === 'object' && typeof data.status === 'string' ? data : null;
+    } catch (error) { if (error && error.contractViolation) throw error; return null; }
+    finally { clearTimeout(timer); }
+}
+function showOutcome(text) { const box = document.getElementById('uncertainNotice'); box.textContent = text; box.hidden = !text; }
+function pendingLabel(p) { return p.date + '　' + p.time + '　' + p.menuName; }
+async function settle(p) {
+    const credentials = {sourceType:'WEB_PAGE', requestId:p.requestId, resumeProof:p.resumeProof};
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    for (let i = 0; ; i++) {
+        let r = null;
+        if (i < settleDelays().length) { await sleep(settleDelays()[i]); r = await callBooking({...credentials, action:'inspect'}); }
+        else { r = await callBooking({...credentials, action:'abandon'}); if (uncertainResult(r)) await sleep(settleRetryMs()); }
+        if (!uncertainResult(r)) return r;
+        showOutcome('送信結果を確認しています（自動で再送はしません）：' + pendingLabel(p) +
+            (r ? '' : '。通信できない間は確認を続けます。この画面を閉じても、次に開いたときに確認を続けます。'));
+    }
+}
+function lockForSubmit(message) {
+    submitting = true; invalidateWeek(); requestId++;
+    if (availabilityController) availabilityController.abort();
+    resetTimes(message);
+    [menuSelect, dateInput, nameInput, phoneInput, requestsInput, policyInput].forEach(element => element.disabled = true);
+    renderCalendar(); renderMenuCards(); renderFlow();
+    loadingMsg.textContent = message; loadingMsg.style.display = 'block'; showNotice('');
+}
+function showCompleted(data, p) {
+    forgetPending(); bookingRequest = null; showOutcome('');
+    const link = document.getElementById('cancelLink'), hint = document.getElementById('cancelLinkHint');
+    // The one cancel screen (customer-cancel/, D1) reads the credentials from the fragment, which is
+    // never sent to a server, and replaces it right away.
+    if (PEPEL_BOOKING_CONFIG.cancelPage && data.canCancel === true && typeof data.cancelToken === 'string' && /^[a-f0-9]{64}$/.test(data.cancelToken)) {
+        link.href = PEPEL_BOOKING_CONFIG.cancelPage + '#cancel=' + encodeURIComponent(data.reservationId) + '&token=' + data.cancelToken;
+        link.rel = 'noreferrer';
+        if (PEPEL_BOOKING_CONFIG.cancelLinkTarget) link.target = PEPEL_BOOKING_CONFIG.cancelLinkTarget; // Apps Script page frame
+        link.hidden = false; hint.hidden = false;
+    } else if (data.cancelTokenAvailable === false || data.canCancel === false || data.canCancel === true) {
+        // T05: the original cancel link cannot be issued again.
+        hint.textContent = data.cancelTokenAvailable === false ? 'この画面ではキャンセル用リンクを再表示できません。キャンセルが必要な場合は、店舗へLINEまたはお電話でご連絡ください。' : 'キャンセルが必要な場合は、店舗へLINEまたはお電話でご連絡ください。';
+        hint.hidden = false;
+    }
+    completed = true; submitting = false; loadingMsg.style.display = 'none';
+    const details = document.getElementById('completedDetails'); details.replaceChildren();
+    [['予約ID', data.reservationId], ['予約したメニュー', p.menuName], ['予約日時', p.date + '　' + p.time]].forEach(([label, value]) => {
+        const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+        dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); details.appendChild(row);
+    });
+    renderFlow(); document.getElementById('completedHeading').focus();
+}
+async function returnToForm(message, toMenu) {
+    submitting = false; loadingMsg.style.display = 'none';
+    [menuSelect, dateInput, nameInput, phoneInput, requestsInput, policyInput].forEach(element => element.disabled = false);
+    flowStep = toMenu || !selectedMenu() ? 'menu' : 'date';
+    renderMenuCards();
+    if (toMenu) await loadMenus();
+    else if (selectedMenu()) { if (dateInput.value) await loadAvailability(); loadWeek(); }
+    showNotice(message); renderFlow();
+}
+async function concludeBooking(data, p) {
+    if (data && data.status === 'success') return showCompleted(data, p);
+    forgetPending(); bookingRequest = null;
+    if (data && data.status === 'request_abandoned') {
+        showOutcome('');
+        return returnToForm('保存されていません（この送信は無効化済みで、後から保存されることはありません）。内容を確認して、もう一度お試しください。', false);
+    }
+    if (data && ['unauthorized','request_content_conflict'].includes(data.status)) {
+        showOutcome('送信結果を確認できませんでした：' + pendingLabel(p) + '。登録済みの可能性があります。同じ内容で予約し直す前に、店舗へLINEまたはお電話でご確認ください。');
+        return returnToForm('', false);
+    }
+    showOutcome('');
+    const message = data.status === 'reconfirmation_required' ? '料金・所要時間・条件が変わりました。内容を確認し直してください。' : data.message || '予約できませんでした。';
+    return returnToForm(message, data.status === 'menu_not_bookable' || data.status === 'configuration_error');
+}
+async function submitReservation() {
+    updateSubmit();
+    if (submitBtn.disabled || flowStep !== 'review' || reviewedSelection !== reviewKey() || !evaluationReady()) return;
+    const other = readPending();
+    if (other && (!bookingRequest || other.requestId !== bookingRequest.requestId)) {
+        showNotice('送信結果を確認中の予約があります。確認が終わるまでお待ちください。'); return;
+    }
+    if (!bookingRequest || bookingRequest.key !== reviewedSelection) bookingRequest = {requestId:randomId(), resumeProof:randomId(), key:reviewedSelection};
+    const ids = selectedMenuIds(), e = checkedEvaluation;
+    const payload = {sourceType:'WEB_PAGE', requestVersion:2, requestId:bookingRequest.requestId, resumeProof:bookingRequest.resumeProof,
+        ...(ids.length === 1 ? {menuId:ids[0]} : {menuIds:ids}), date:dateInput.value, time:timeSelect.value, name:nameInput.value.trim(),
+        phone:normalizedPhone(phoneInput.value), customerRequests:customerRequests(), attributes:JSON.parse(JSON.stringify(conditions.attributes)),
+        ...(conditions.consultationContentChanged === null ? {} : {consultationContentChanged:conditions.consultationContentChanged}),
+        ...(visitAsked && visitExperience ? {visitExperience} : {}),
+        confirmation:{totalMinYen:e.pricing.total.minimumYen, totalMaxYen:e.pricing.total.maximumYen, certainty:e.pricing.total.certainty, finalDurationMinutes:e.duration.finalDurationMinutes}};
+    const p = {requestId:payload.requestId, resumeProof:payload.resumeProof, date:payload.date, time:payload.time, menuName:selectedMenu().name};
+    lockForSubmit('予約を送信中...');
+    rememberPending(p); // before sending: a reload or another tab continues the inquiry
+    let data;
+    try { data = await callBooking(payload); }
+    catch (error) {
+        forgetPending(); bookingRequest = null;
+        return returnToForm('予約画面の設定に問題があるため、送信していません。画面を更新してください。', false);
+    }
+    if (uncertainResult(data)) {
+        loadingMsg.textContent = '送信結果を確認中...';
+        showOutcome('送信結果を確認しています（自動で再送はしません）：' + pendingLabel(p));
+        data = await settle(p);
+    }
+    return concludeBooking(data, p);
+}
+async function resumePending() {
+    const p = readPending();
+    if (!p || completed || submitting) return;
+    lockForSubmit('前回の送信結果を確認中...');
+    showOutcome('前回の送信結果を確認しています（自動で再送はしません）：' + pendingLabel(p));
+    return concludeBooking(await settle(p), p);
+}
+
+const GAS_WEB_APP_URL = PEPEL_BOOKING_CONFIG.apiBase;
+
+
+// 名称・価格・所要時間はすべてGASのメニュー設定から取得する。
+const dateInput = document.getElementById('date');
+const menuSelect = document.getElementById('menu');
+const timeSelect = document.getElementById('time');
+const nameInput = document.getElementById('name');
+const phoneInput = document.getElementById('phone');
+const requestsInput = document.getElementById('customerRequests');
+const policyInput = document.getElementById('cancelPolicy');
+const MAX_REQUESTS_LENGTH = 100;
+const submitBtn = document.getElementById('submitBtn');
+const loadingMsg = document.getElementById('loadingMsg');
+const notice = document.getElementById('notice');
+let menus = [];
+let availableTimes = [];
+let checkedKey = null;
+let requestId = 0;
+let availabilityController = null;
+let submitting = false;
+let completed = false;
+let menusLoading = false;
+let pendingSlot = null;
+
+// サロンの日本時間で日付の下限を設定（端末のタイムゾーンには依存しない）。
+const todayParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit'
+}).formatToParts(new Date());
+dateInput.min = ['year', 'month', 'day'].map(type =>
+    todayParts.find(part => part.type === type).value).join('-');
+
+const calendar = document.getElementById('calendar');
+const calendarDays = document.getElementById('calendarDays');
+const monthLabel = document.getElementById('monthLabel');
+const selectedDate = document.getElementById('selectedDate');
+const menuDetails = document.getElementById('menuDetails');
+const timeButtons = document.getElementById('timeButtons');
+const timeStatus = document.getElementById('timeStatus');
+const prevMonth = document.getElementById('prevMonth');
+const nextMonth = document.getElementById('nextMonth');
+let calendarMonth = dateInput.min.slice(0, 7);
+
+let flowStep = 'menu';
+let reviewedSelection = null;
+const menuCards = document.getElementById('menuCards');
+const reviewDetails = document.getElementById('reviewDetails');
+const flowSteps = ['menu', 'date', 'customer', 'review'];
+// hidden selectの値は単独ID、または複数IDのJSON。通信条件と選択状態を同じキーで管理する。
+function selectedMenuIds() {
+    if (!menuSelect.value) return [];
+    if (menuSelect.value.startsWith('[')) {
+        try { return JSON.parse(menuSelect.value); } catch (_) { return []; }
+    }
+    return [menuSelect.value];
+}
+function selectedMenu() {
+    const ids = selectedMenuIds();
+    const items = ids.map(id => menus.find(item => item.id === id && item.webBookingEnabled && item.bookable));
+    if (!items.length || items.some(item => !item)) return null;
+    if (items.length === 1) return items[0];
+    return { name: items.map(item => item.name).join(' ＋ '),
+        category: '選択中：' + items.length + 'メニュー',
+        price: items.map(item => item.price).join(' ＋ '),
+        durationMinutes: items.reduce((sum,item) => sum + item.durationMinutes,0) };
+}
+function menuQuery(key) {
+    return (key.startsWith('[') ? '&menuIds=' + encodeURIComponent(key) : '&menuId=' + encodeURIComponent(key)) + conditionQuery();
+}
+function responseMenuKey(data) {
+    return Array.isArray(data.menuIds) ? (data.menuIds.length === 1 ? data.menuIds[0] : JSON.stringify(data.menuIds)) : data.menuId;
+}
+function normalizedPhone(value) {
+    if (typeof value !== 'string' || value.length > 40) return '';
+    const text = value.trim().replace(/[０-９]/g, digit => String(digit.charCodeAt(0) - 0xFF10))
+        .replace(/[‐‑‒–—―−ー－]/g, '-').replace(/\s/g, '');
+    if (!/^[0-9]+(?:-[0-9]+)*$/.test(text)) return '';
+    const digits = text.replace(/-/g, '');
+    return /^0[0-9]{9,10}$/.test(digits) && !/^0+$/.test(digits) ? digits : '';
+}
+function bookingReady() {
+    return !completed && !submitting && !pendingSlot && !!selectedMenu() && checkedKey === selectionKey() && evaluationReady() &&
+        !timeSelect.disabled && isCustomerStartTime(timeSelect.value) && availableTimes.includes(timeSelect.value);
+}
+function customerRequests() { return requestsInput.value.replace(/\r\n?/g, '\n').trim(); }
+function customerDetailsReady() {
+    return !!nameInput.value.trim() && !!normalizedPhone(phoneInput.value) &&
+        requestsInput.value.length <= MAX_REQUESTS_LENGTH && policyInput.checked === true;
+}
+function reviewKey() {
+    return JSON.stringify([selectionKey(), timeSelect.value, nameInput.value.trim(),
+        normalizedPhone(phoneInput.value), customerRequests(), policyInput.checked]);
+}
+function showStep(step, focus = true) {
+    if (submitting || completed) return;
+    if (step !== 'menu' && !selectedMenu()) return;
+    if ((step === 'customer' || step === 'review') && !bookingReady()) return;
+    if (step === 'review' && !customerDetailsReady()) return;
+    flowStep = step;
+    if (step !== 'review') reviewedSelection = null;
+    renderFlow();
+    if (step === 'date') {
+        const start = dateInput.value || dateInput.min;
+        const hasWeek = weekMenuId === menuSelect.value && weekDays.length === 7 && weekDays.some(day => day.date === start);
+        if (!hasWeek) { weekStart = mondayOf(start); loadWeek(); }
+    }
+    if (focus) {
+        const headings = {menu:'menuHeading',date:'dateLabel',customer:'customerHeading',review:'reviewHeading'};
+        document.getElementById(headings[step]).focus();
+    }
+}
+function renderFlow() {
+    document.getElementById('bookingForm').hidden = completed;
+    document.getElementById('completedPanel').hidden = !completed || !!cancelCredentials;
+    if (completed) {
+        flowSteps.forEach(step => { document.getElementById(step + 'Panel').hidden = true; });
+        submitBtn.disabled = true;
+        return;
+    }
+    document.getElementById('bookingForm').setAttribute('data-step', flowStep);
+    const menu = selectedMenu();
+    flowSteps.forEach(step => document.getElementById('step-' + step).setAttribute('aria-current', flowStep === step ? 'step' : 'false'));
+    flowSteps.forEach(step => { document.getElementById(step + 'Panel').hidden = flowStep !== step; });
+    document.getElementById('flowProgress').textContent = (flowSteps.indexOf(flowStep) + 1) + ' / 4　' +
+        ({menu:'メニュー',date:'日付・時間',customer:'お客様情報',review:'予約内容確認'})[flowStep];
+    document.getElementById('menuSummary').hidden = !menu || flowStep === 'menu';
+    document.getElementById('menuSummaryText').textContent = menu ? menu.name + (flowStep === 'date' ? '　' : '\n') + evaluationSummary() : '';
+    document.getElementById('dateSummary').hidden = flowStep !== 'customer' && flowStep !== 'review';
+    document.getElementById('dateSummaryText').textContent = dateInput.value + '　' + timeSelect.value;
+    document.getElementById('timeContext').textContent = dateInput.value ? dateInput.value + ' の予約可能時間' : '';
+    document.getElementById('toDate').disabled = submitting || menuSelect.disabled || !menu;
+    const nextButton = document.getElementById('toCustomer');
+    nextButton.textContent = pendingSlot ? '空き状況を確認中…' : 'お客様情報へ';
+    nextButton.disabled = !bookingReady();
+    document.getElementById('reviewBtn').disabled = !bookingReady() || !customerDetailsReady();
+    ['editMenu','editDate','backDate','backCustomer'].forEach(id => { document.getElementById(id).disabled = submitting; });
+}
+function renderMenuCards() {
+    menuCards.replaceChildren();
+    const groups = new Map();
+    menus.filter(menu => menu.webBookingEnabled === true).forEach(menu => {
+        if (!groups.has(menu.category)) {
+            const group = document.createElement('div');
+            const title = document.createElement('h3'); title.className = 'category-title'; title.textContent = menu.category;
+            group.appendChild(title); menuCards.appendChild(group); groups.set(menu.category, group);
+        }
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'menu-card';
+        button.disabled = submitting || menuSelect.disabled || !menu.bookable;
+        button.setAttribute('aria-pressed', String(selectedMenuIds().includes(menu.id)));
+        const name = document.createElement('span'); name.textContent = menu.name;
+        const meta = document.createElement('span'); meta.className = 'card-meta';
+        meta.textContent = menu.price + ' / ' + (Number.isInteger(menu.durationMinutes) ? menu.durationMinutes + '分' : '所要時間設定中');
+        const state = document.createElement('span'); state.className = 'card-meta';
+        state.textContent = !menu.bookable ? 'WEB予約受付準備中' : selectedMenuIds().includes(menu.id) ? '✓ 選択中（押すと解除）' : '選択する';
+        button.appendChild(name); button.appendChild(meta); button.appendChild(state);
+        button.addEventListener('click', () => selectMenu(menu.id, true));
+        groups.get(menu.category).appendChild(button);
+    });
+}
+let combinationOption = null;
+function selectMenu(id, toggle = false) {
+    const menu = menus.find(item => item.id === id && item.webBookingEnabled && item.bookable);
+    if (completed || submitting || menuSelect.disabled || !menu) return;
+    const current = selectedMenuIds();
+    const ids = toggle ? (current.includes(id) ? current.filter(value => value !== id) : [...current,id]) : [id];
+    const key = ids.length > 1 ? JSON.stringify(ids) : ids[0] || '';
+    // 実DOMのselectは存在しない値を保持できないため、複数選択用の選択肢を1つだけ用意する。
+    if (combinationOption) { combinationOption.remove(); combinationOption = null; }
+    if (ids.length > 1) {
+        combinationOption = new Option('選択中のメニュー',key);
+        menuSelect.appendChild(combinationOption);
+    }
+    menuSelect.value = key;
+    resetConditions();
+    requestId++;
+    if (availabilityController) availabilityController.abort();
+    invalidateWeek();
+    dateInput.value = '';
+    weekStart = mondayOf(dateInput.min);
+    resetTimes('日時を選択してください');
+    renderCalendar();
+    renderMenuCards();
+    renderFlow();
+    // メニュー画面では取得しない。「日付を選ぶ」で新メニューの週を1回取得。
+    if (flowStep === 'date') loadWeek();
+}
+function openReview() {
+    if (!bookingReady() || !customerDetailsReady()) return;
+    const menu = selectedMenu();
+    reviewDetails.replaceChildren();
+    [...(visitExperience ? [['ご来店',VISIT_LABEL[visitExperience]]] : []),['メニュー',menu.name],['料金',priceLines(checkedEvaluation).join('\n')],['所要時間',durationText(checkedEvaluation)],
+        ['ご予約日時',dateInput.value + '　' + timeSelect.value + '〜' + endTimeOf(timeSelect.value, checkedEvaluation)],['お名前',nameInput.value.trim()],['電話番号',normalizedPhone(phoneInput.value)],
+        ...(customerRequests() ? [['ご要望など',customerRequests()]] : [])].forEach(([label,value]) => {
+        const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+        dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); reviewDetails.appendChild(row);
+    });
+    reviewedSelection = reviewKey(); showStep('review'); updateSubmit();
+}
+document.getElementById('toDate').addEventListener('click', () => showStep('date'));
+document.getElementById('toCustomer').addEventListener('click', () => showStep('customer'));
+document.getElementById('reviewBtn').addEventListener('click', openReview);
+document.getElementById('editMenu').addEventListener('click', () => showStep('menu'));
+['editDate','backDate'].forEach(id => document.getElementById(id).addEventListener('click', () => showStep('date')));
+document.getElementById('backCustomer').addEventListener('click', () => showStep('customer'));
+
+// 表の行は表示用の目盛り。今日以降の選択可否は各日のavailableStartTimesで決める。
+let weekStart = mondayOf(dateInput.min);
+let weekVersion = 0;
+let weekController = null;
+let weekDays = [];
+let weekMenuId = '';
+function addDays(date, days) {
+    const value = new Date(date + 'T00:00:00Z');
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0,10);
+}
+function mondayOf(date) {
+    const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
+    return addDays(date, -((weekday + 6) % 7));
+}
+function invalidateWeek() {
+    document.getElementById('calendarLoading').hidden = true;
+    pendingSlot = null;
+    weekLoadingKey = null;
+    weekVersion++;
+    if (weekController) weekController.abort();
+    weekDays = [];
+    document.getElementById('schedule').replaceChildren();
+    renderFlow();
+}
+// slotMinutes remains the ten-minute internal unit. Start times have a separate grid.
+function isCustomerStartTime(time) { return typeof time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time) &&
+    (Number(time.slice(0,2)) * 60 + Number(time.slice(3))) % PEPEL_BOOKING_CONFIG.startIntervalMinutes === 0; }
+function customerAvailability(data) {
+    // Version 17 responses may still contain ten-minute candidates during rollout.
+    // Keep only API-authorized starts on the configured grid; never round or synthesize candidates.
+    return {...data, availableStartTimes:[...new Set(data.availableStartTimes.filter(isCustomerStartTime))]};
+}
+function validAvailability(data, date, menuId) {
+    return data.date === date && responseMenuKey(data) === menuId && data.slotMinutes === 10 &&
+        typeof data.isClosed === 'boolean' && Array.isArray(data.availableStartTimes) &&
+        data.startIntervalMinutes === PEPEL_BOOKING_CONFIG.startIntervalMinutes &&
+        data.availableStartTimes.every(time => /^(?:[01]\d|2[0-3]):[0-5]0$/.test(time)) && validEvaluation(data.evaluation);
+}
+function renderWeek() {
+    const table = document.getElementById('schedule'); table.replaceChildren();
+    table.setAttribute('aria-busy', String(!!pendingSlot || !!weekLoadingKey));
+    document.getElementById('calendarLoading').hidden = !weekLoadingKey;
+    document.getElementById('calendarRegion').setAttribute('aria-busy', String(!!weekLoadingKey));
+    const head = document.createElement('thead'), header = document.createElement('tr');
+    const corner = document.createElement('th'); corner.textContent = '時刻'; header.appendChild(corner);
+    weekDays.forEach(day => {
+        const th = document.createElement('th'); th.setAttribute('scope','col');
+        const weekdayIndex = new Date(day.date + 'T00:00:00Z').getUTCDay();
+        th.className = weekdayIndex === 6 ? 'saturday' : weekdayIndex === 0 ? 'sunday' : '';
+        const weekday = ['日','月','火','水','木','金','土'][weekdayIndex];
+        const dateLabel = document.createElement('span'); dateLabel.className = 'schedule-date';
+        dateLabel.textContent = day.date.slice(5).replace('-','/');
+        const weekdayLabel = document.createElement('span');
+        weekdayLabel.className = 'schedule-weekday';
+        weekdayLabel.textContent = weekday;
+        th.appendChild(dateLabel); th.appendChild(weekdayLabel);
+        header.appendChild(th);
+    });
+    head.appendChild(header); table.appendChild(head);
+    const times = new Set();
+    weekDays.forEach(day => {
+        if (!day.data) return;
+        day.data.availableStartTimes.forEach(time => times.add(time));
+        const toMinutes = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) ? Number(value.slice(0,2))*60+Number(value.slice(3)) : null;
+        const start = toMinutes(day.data.openingTime), end = toMinutes(day.data.closingTime);
+        if (start !== null && end !== null) {
+            for (let step = PEPEL_BOOKING_CONFIG.startIntervalMinutes, minute = Math.ceil(start/step)*step; minute < end; minute+=step)
+                times.add(String(Math.floor(minute/60)).padStart(2,'0') + ':' + String(minute%60).padStart(2,'0'));
+        }
+    });
+    const body = document.createElement('tbody');
+    const labels = [...times].filter(isCustomerStartTime).sort();
+    if (!labels.length) labels.push('—');
+    labels.forEach(time => {
+        const row = document.createElement('tr'), label = document.createElement('th');
+        label.textContent = time; label.setAttribute('scope','row'); row.appendChild(label);
+        weekDays.forEach(day => {
+            const cell = document.createElement('td');
+            const past = day.date < dateInput.min;
+            const canBook = !past && day.data && !day.data.isClosed && day.data.availableStartTimes.includes(time);
+            if (canBook) {
+                const button = document.createElement('button'); button.type = 'button'; button.textContent = '◎';
+                button.disabled = submitting || !!pendingSlot || weekMenuId !== menuSelect.value;
+                button.setAttribute('aria-label', day.date + ' ' + time + ' 予約可能');
+                button.setAttribute('aria-pressed', String(pendingSlot ? pendingSlot.date === day.date && pendingSlot.time === time : dateInput.value === day.date && timeSelect.value === time));
+                const version = weekVersion;
+                button.addEventListener('click', () => selectWeekSlot(day.date, time, version));
+                cell.appendChild(button);
+            } else {
+                const waiting = !past && day.data && day.data.evaluation.state === 'needs_information';
+                cell.className = waiting ? 'unknown waiting' : past || day.data ? 'unavailable' : 'unknown';
+                cell.textContent = waiting ? '' : past || day.data ? '' : day.error ? '再取得' : '…';
+                cell.setAttribute('aria-label',day.date + ' ' + time + (past ? ' 過去日のため予約不可' : waiting ? ' 条件の選択待ち' : day.data ? ' 予約不可' : day.error ? ' 取得失敗' : ' 取得中'));
+            }
+            row.appendChild(cell);
+        });
+        body.appendChild(row);
+    });
+    table.appendChild(body);
+    renderConditions();
+    renderFlow(); // the summary may now show the week's uniform evaluation
+}
+function selectWeekSlot(date, time, version) {
+    return recheckWeekSlot(date, time, version);
+}
+async function recheckWeekSlot(date, time, version) {
+    if (submitting || completed || pendingSlot || version !== weekVersion || weekMenuId !== menuSelect.value) return;
+    if (date < dateInput.min || !isCustomerStartTime(time)) return;
+    if (bookingReady() && dateInput.value === date && timeSelect.value === time) return;
+    dateInput.value = date;
+    calendarMonth = date.slice(0,7);
+    const slot = {date:date, time};
+    pendingSlot = slot;
+    const pending = loadAvailability();
+    document.getElementById('selectionStatus').textContent = '選択中：' + date + ' ' + time;
+    renderWeek();
+    const selectionRequest = requestId;
+    const outcome = await pending;
+    if (pendingSlot !== slot) return;
+    pendingSlot = null;
+    renderFlow(); renderWeek();
+    document.getElementById('selectionStatus').textContent = checkedKey === selectionKey() && availableTimes.includes(time) ?
+        '選択中：' + date + ' ' + time : outcome === 'error' ?
+        '空き状況を確認できませんでした。同じ枠か別の◎を選んでください。' :
+        'この予約枠は埋まったか、受付できなくなりました。別の◎を選んでください。';
+    if (selectionRequest !== requestId || version !== weekVersion || dateInput.value !== date || checkedKey !== selectionKey() || !availableTimes.includes(time)) return;
+    timeSelect.value = time;
+    timeStatus.textContent = '選択中：' + date + ' ' + time;
+    updateSubmit(); renderWeek();
+
+}
+
+let weekLoadingKey = null;
+async function loadWeek(retryFailed = false) {
+    if (completed || !selectedMenu() || submitting) return;
+    const currentWeek = mondayOf(dateInput.min);
+    weekStart = mondayOf(weekStart);
+    if (weekStart < currentWeek) weekStart = currentWeek;
+    const menuId = menuSelect.value;
+    const key = menuId + '|' + weekStart;
+    if (weekLoadingKey === key) return;
+    const preserve = retryFailed && weekMenuId === menuId && weekDays.length === 7 && weekDays[0].date === weekStart;
+    const targets = preserve ? weekDays.filter(day => !day.data || day.error).map(day => day.date) :
+        Array.from({length:7},(_,i)=>addDays(weekStart,i));
+    if (!targets.length) return;
+    if (preserve) {
+        weekVersion++;
+        if (weekController) weekController.abort();
+    } else {
+        invalidateWeek();
+        weekDays = targets.map(date=>({date}));
+    }
+    const version = weekVersion;
+    weekMenuId = menuId;
+    weekLoadingKey = key;
+    const controller = new AbortController(); weekController = controller;
+    const timer = setTimeout(() => controller.abort(), 30000);
+    document.getElementById('weekLabel').textContent = weekStart.slice(5).replace('-','/') + '〜' + addDays(weekStart,6).slice(5).replace('-','/');
+    document.getElementById('prevWeek').disabled = weekStart <= currentWeek;
+    document.getElementById('weekStatus').textContent = '';
+    document.getElementById('retryWeek').hidden = true;
+    renderWeek();
+    try {
+        const data = await requestJSON(GAS_WEB_APP_URL + '?action=availabilityWeek&startDate=' +
+            encodeURIComponent(weekStart) + menuQuery(menuId) +
+            (preserve ? '&dates=' + encodeURIComponent(targets.join(',')) : ''), {signal:controller.signal});
+        if (version !== weekVersion || menuId !== menuSelect.value) return;
+        if (responseMenuKey(data) !== menuId || data.startDate !== weekStart || data.slotMinutes !== 10 || !data.days || typeof data.days !== 'object')
+            throw new Error('週間空き状況の形式が不正です');
+        targets.forEach(date => {
+            const day = weekDays.find(item=>item.date===date), result = data.days[date];
+            if (result && result.status === 'success' && validAvailability(result,date,menuId)) {
+                day.data = customerAvailability(result); day.error = false;
+            } else { day.error = true; delete day.data; }
+        });
+    } catch(error) {
+        if (version !== weekVersion || menuId !== menuSelect.value) return;
+        targets.forEach(date => { const day = weekDays.find(item=>item.date===date); day.error = true; delete day.data; });
+    } finally {
+        clearTimeout(timer);
+        if (version === weekVersion) {
+            weekLoadingKey = null;
+            renderWeek();
+            const failed = weekDays.some(day=>day.error);
+            document.getElementById('weekStatus').textContent = failed ? '取得できない日があります。再取得してください。' :
+                weekDays.some(day=>day.date >= dateInput.min && day.data && !day.data.isClosed && day.data.availableStartTimes.length) ?
+                '' : weekConditionMessage() || 'この7日間は予約できる時間がありません。';
+            document.getElementById('retryWeek').hidden = !failed;
+        }
+    }
+}
+function moveWeek(delta) {
+    if (submitting || completed) return;
+    const next = addDays(weekStart,delta*7);
+    if (next < mondayOf(dateInput.min)) return;
+    weekStart = next;
+    resetTimes('日時を選択してください');
+    loadWeek();
+}
+document.getElementById('prevWeek').addEventListener('click',()=>moveWeek(-1));
+document.getElementById('nextWeek').addEventListener('click',()=>moveWeek(1));
+document.getElementById('retryWeek').addEventListener('click',()=>loadWeek(true));
+
+function renderCalendar() {
+    const menu = selectedMenu();
+    calendar.disabled = submitting || !menu || menuSelect.disabled;
+    menuDetails.textContent = menu ? [menu.category, menu.name, '料金・所要時間は日時を選ぶと表示されます'].join(' / ') : 'メニューを選択してください。';
+    selectedDate.textContent = dateInput.value ? '選択日：' + dateInput.value :
+        menu ? '日付を選択してください。' : 'メニューを選択してから日付を選んでください。';
+    const [year, month] = calendarMonth.split('-').map(Number);
+    monthLabel.textContent = year + '年' + month + '月';
+    prevMonth.disabled = calendar.disabled || calendarMonth <= dateInput.min.slice(0, 7);
+    nextMonth.disabled = calendar.disabled;
+    calendarDays.replaceChildren();
+    const offset = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+    const count = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    for (let i = 0; i < offset; i++) calendarDays.appendChild(document.createElement('span'));
+    for (let day = 1; day <= count; day++) {
+        const date = calendarMonth + '-' + String(day).padStart(2, '0');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = String(day);
+        button.disabled = calendar.disabled || date < dateInput.min;
+        button.setAttribute('aria-label', year + '年' + month + '月' + day + '日');
+        button.setAttribute('aria-pressed', String(date === dateInput.value));
+        if (date === dateInput.min) { button.className = 'today'; button.setAttribute('aria-current', 'date'); }
+        button.addEventListener('click', () => {
+            if (button.disabled || submitting) return;
+            dateInput.value = date;
+            renderCalendar();
+            loadAvailability();
+            weekStart = mondayOf(date); loadWeek();
+        });
+        calendarDays.appendChild(button);
+    }
+}
+function moveMonth(delta) {
+    if (calendar.disabled) return;
+    const [year, month] = calendarMonth.split('-').map(Number);
+    const next = new Date(Date.UTC(year, month - 1 + delta, 1)).toISOString().slice(0, 7);
+    if (next < dateInput.min.slice(0, 7)) return;
+    calendarMonth = next;
+    renderCalendar();
+}
+function renderTimeButtons() {
+    timeButtons.replaceChildren();
+    availableTimes.forEach(time => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = time;
+        button.setAttribute('aria-pressed', String(timeSelect.value === time));
+        button.addEventListener('click', () => {
+            if (submitting || checkedKey !== selectionKey() || !availableTimes.includes(time)) return;
+            timeSelect.value = time;
+            for (const item of timeButtons.children) item.setAttribute('aria-pressed', String(item === button));
+            updateSubmit();
+        });
+        timeButtons.appendChild(button);
+    });
+}
+prevMonth.addEventListener('click', () => moveMonth(-1));
+nextMonth.addEventListener('click', () => moveMonth(1));
+
+function showNotice(message) {
+    notice.textContent = message;
+    notice.style.display = message ? 'block' : 'none';
+}
+
+function resetTimes(message) {
+    reviewedSelection = null;
+    document.getElementById('selectionStatus').textContent = '◎から開始時刻を選択（黒は予約不可）';
+    timeButtons.replaceChildren();
+    timeStatus.textContent = message;
+    availableTimes = [];
+    checkedKey = null;
+    checkedEvaluation = null;
+    timeSelect.replaceChildren(new Option(message, ''));
+    timeSelect.disabled = true;
+    submitBtn.disabled = true;
+    renderFlow();
+}
+
+function selectionKey() {
+    return dateInput.value + '|' + menuSelect.value + '|' + conditionsKey();
+}
+
+function updateSubmit() {
+    submitBtn.disabled = completed || submitting || checkedKey !== selectionKey() ||
+        timeSelect.disabled || !isCustomerStartTime(timeSelect.value) || !availableTimes.includes(timeSelect.value) ||
+        !customerDetailsReady();
+    renderFlow();
+}
+
+async function requestJSON(url, options = {}) {
+    const response = await PepelBookingApi.fetch(url, options);
+    if (!response.ok) throw new Error('通信できませんでした。時間を置いて再度お試しください。');
+    const data = await response.json();
+    if (!data || data.status !== 'success') {
+        const error = new Error(data && data.message || '予約情報を取得できませんでした。');
+        error.status = data && data.status;
+        throw error;
+    }
+    return data;
+}
+
+async function loadMenus() {
+    if (completed || menusLoading) return;
+    menusLoading = true;
+    document.getElementById('menuLoading').hidden = false;
+    menuCards.hidden = true;
+    document.getElementById('retryMenus').hidden = true;
+    menuCards.setAttribute('aria-busy', 'true');
+    requestId++;
+    if (availabilityController) availabilityController.abort();
+    resetTimes('日付とメニューを選択してください');
+    invalidateWeek();
+    combinationOption = null;
+    menuSelect.disabled = true;
+    menuSelect.replaceChildren(new Option('メニューを読み込み中...', ''));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+        const data = await requestJSON(GAS_WEB_APP_URL + '?action=menus' + visitQuery(), { signal: controller.signal });
+        if (!Array.isArray(data.menus) || data.slotMinutes !== 10 ||
+            !data.menus.every(menu => menu && typeof menu.id === 'string' && menu.id &&
+                typeof menu.category === 'string' && typeof menu.name === 'string' &&
+                typeof menu.price === 'string' && typeof menu.bookable === 'boolean')) {
+            throw new Error('メニュー情報の形式が不正です。');
+        }
+        if (!acceptVisit(data)) { menus = []; menuSelect.replaceChildren(new Option('メニューを選択してください', '')); return; }
+        menus = data.menus;
+        menuSelect.replaceChildren(new Option('メニューを選択してください', ''));
+        const groups = new Map();
+        menus.forEach(menu => {
+            if (menu.webBookingEnabled !== true) return;
+            if (!groups.has(menu.category)) {
+                const group = document.createElement('optgroup');
+                group.label = menu.category;
+                groups.set(menu.category, group);
+                menuSelect.appendChild(group);
+            }
+            const suffix = menu.bookable ? '' : menu.unavailableReason === 'duration_not_set' ?
+                '（所要時間設定中）' : '（WEB予約受付準備中）';
+            const option = new Option(menu.name + ' ' + menu.price + (Number.isInteger(menu.durationMinutes) ? ' / ' + menu.durationMinutes + '分' : '') + suffix, menu.id);
+            option.disabled = !menu.bookable;
+            groups.get(menu.category).appendChild(option);
+        });
+        menuSelect.disabled = !menus.some(menu => menu.webBookingEnabled && menu.bookable);
+        showNotice(menuSelect.disabled ? '現在WEB予約できるメニューがありません。' : '');
+    } catch (error) {
+        menuSelect.replaceChildren(new Option('メニューを取得できませんでした', ''));
+        showNotice('メニューを取得できませんでした。再取得ボタンを押してください。');
+        document.getElementById('retryMenus').hidden = false;
+    } finally { clearTimeout(timer); menusLoading = false; document.getElementById('menuLoading').hidden = true; menuCards.hidden = false; menuCards.setAttribute('aria-busy', 'false'); renderCalendar(); renderMenuCards(); renderFlow(); }
+}
+
+async function loadAvailability() {
+    if (completed) return;
+    renderCalendar();
+    const currentRequest = ++requestId;
+    if (availabilityController) availabilityController.abort();
+    resetTimes('日付とメニューを選択してください');
+    showNotice('');
+    const date = dateInput.value;
+    const menuId = menuSelect.value;
+    const menu = selectedMenu();
+    if (!date || !menu) return;
+    if (date < dateInput.min) { showNotice('今日以降の日付を選択してください。'); return; }
+    const key = selectionKey();
+    resetTimes(pendingSlot ? '' : '空き状況を確認中...');
+    const controller = new AbortController();
+    availabilityController = controller;
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+        const data = await requestJSON(GAS_WEB_APP_URL + '?action=availability&date=' +
+            encodeURIComponent(date) + menuQuery(menuId), { signal: controller.signal });
+        if (currentRequest !== requestId || key !== selectionKey()) return;
+        if (!validAvailability(data, date, menuId)) {
+            throw new Error('空き状況の形式が不正です。');
+        }
+        const displayedDay = weekMenuId === menuId && weekDays.find(day => day.date === date);
+        if (displayedDay) {
+            displayedDay.data = customerAvailability(data);
+            displayedDay.error = false;
+            renderWeek();
+        }
+        if (data.isClosed) { resetTimes('休業日です'); showNotice('この日は休業日です。'); return 'unavailable'; }
+        if (!evaluationReady(data.evaluation)) { resetTimes('この条件ではご予約いただけません'); showNotice(evaluationMessage(data.evaluation)); renderConditions(); return 'unavailable'; }
+        if (data.bookingAvailable === false) { resetTimes('この組み合わせはWEBでご予約いただけません'); showNotice(TOTAL_NOT_FIXED_TEXT); return 'unavailable'; }
+        const startTimes = customerAvailability(data).availableStartTimes;
+        if (!startTimes.length) {
+            resetTimes('予約可能な時間がありません');
+            showNotice('この日は予約可能な時間がありません。');
+            return 'unavailable';
+        }
+        // 時刻をローカル生成・補完しない。GASが許可した時刻だけを表示。
+        availableTimes = startTimes;
+        timeSelect.replaceChildren(new Option('開始時刻を選択してください', ''),
+            ...availableTimes.map(time => new Option(time, time)));
+        timeSelect.disabled = false;
+        checkedKey = key;
+        checkedEvaluation = data.evaluation;
+        timeStatus.textContent = '開始時刻を選択してください。';
+        renderTimeButtons();
+        updateSubmit();
+        return 'available';
+    } catch (error) {
+        if (currentRequest !== requestId || key !== selectionKey()) return;
+        resetTimes('空き状況を取得できませんでした');
+        showNotice(error.name === 'AbortError' ? '取得に時間がかかっています。日付を選び直してください。' : error.message);
+        return 'error';
+    } finally { clearTimeout(timer); }
+}
+
+// submitReservation(): see booking_v3.js (request ID, outcome inquiry).
+
+document.getElementById('retryMenus').addEventListener('click', loadMenus);
+
+// input時点で古い時刻を無効化。changeで確定した条件を取得する。
+dateInput.addEventListener('input', () => {
+    requestId++;
+    if (availabilityController) availabilityController.abort();
+    resetTimes('日付とメニューを選択してください');
+});
+dateInput.addEventListener('change', loadAvailability);
+menuSelect.addEventListener('change', () => selectMenu(menuSelect.value));
+timeSelect.addEventListener('change', updateSubmit);
+nameInput.addEventListener('input', updateSubmit);
+phoneInput.addEventListener('input', updateSubmit);
+requestsInput.addEventListener('input', updateSubmit);
+policyInput.addEventListener('change', updateSubmit);
+submitBtn.addEventListener('click', submitReservation);
+// Self-cancel: the one cancel screen (customer-cancel/). The fragment is handed over unchanged.
+let cancelCredentials = null; // set while this page shows the cancel notice (renderFlow hides the completion)
+function handOffCancellation() {
+    if (!new URLSearchParams(location.hash.slice(1)).has('cancel')) return false;
+    if (PEPEL_BOOKING_CONFIG.cancelPage) { location.replace(PEPEL_BOOKING_CONFIG.cancelPage + location.hash); return true; }
+    history.replaceState(null, '', location.pathname + location.search + '#cancel');
+    completed = true; cancelCredentials = {};
+    document.getElementById('bookingForm').hidden = true;
+    document.getElementById('cancelPanel').hidden = false;
+    document.getElementById('cancelNotice').textContent = 'キャンセルは店舗へLINEまたはお電話でご連絡ください。';
+    return true;
+}
+window.addEventListener('hashchange', handOffCancellation);
+if (handOffCancellation()) {}
+else { resetTimes('日付とメニューを選択してください'); renderCalendar(); loadMenus().then(resumePending); }
+
+</script>
+
+</body>
+</html>
