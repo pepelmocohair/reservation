@@ -169,7 +169,13 @@
         .conditions fieldset label { display:flex; align-items:center; gap:6px; min-height:44px; }
         .schedule td.waiting { background:#f2efe8; }
         .visit-question .visit-options { display:grid; gap:10px; margin:0 0 14px; }
-        #menuPanel[data-visit="ask"] #menuHeading, #menuPanel[data-visit="ask"] #menuCards, #menuPanel[data-visit="ask"] #toDate { display:none; }
+        #menuPanel[data-visit="ask"] #menuHeading, #menuPanel[data-visit="ask"] #menuCards, #menuPanel[data-visit="ask"] #toDate,
+        #menuPanel[data-visit="ask"] #menuEvaluation, #menuPanel[data-visit="ask"] #menuStatus { display:none; }
+        .menu-status { margin:0 0 8px; }
+        .menu-status[data-kind="error"] { color:#6b4a00; }
+        .menu-evaluation:not([hidden]) { display:block; margin:10px 0 0; padding:10px 12px; border:1px solid #d9d4c7; border-radius:8px; background:#fff; font-size:14px; }
+        .menu-evaluation[data-state="loading"] { color:#6b6457; }
+        .menu-evaluation[data-state="blocked"], .menu-evaluation[data-state="error"] { border-color:#d9a400; background:#fff8e6; }
     </style>
 </head>
 
@@ -244,6 +250,9 @@
         <label for="phone">電話番号（必須）</label>
         <input type="tel" id="phone" inputmode="tel" autocomplete="tel" maxlength="40" placeholder="090-1234-5678" aria-describedby="phoneHint" required>
         <p id="phoneHint" class="hint">国内の電話番号を入力してください。ハイフンあり・なし、どちらでも入力できます。</p>
+        <label for="email">メールアドレス（任意）</label>
+        <input type="email" id="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="example@example.com" aria-describedby="emailHint">
+        <p id="emailHint" class="hint">お知らせはLINEでお送りします。LINEで送れなかったときのために、メールアドレスも登録できます。</p>
         <label for="customerRequests">メッセージ・ご要望があればどうぞ（任意）</label>
         <textarea id="customerRequests" rows="2" maxlength="100"></textarea>
         <section class="cancel-policy" aria-labelledby="cancelPolicyHeading">
@@ -297,12 +306,12 @@
 // with its requestId/resumeProof, the D01 conditions, and the v44 inspect/abandon receipt calls.
 // Anything else is refused before it is sent. The adapter never adds fields, retries or writes.
 // Transports: 'http' (fetch) for static hosts, or 'gas' (google.script.run) when hosted by GAS.
-const PEPEL_BOOKING_CONFIG = {"transport":"http","apiBase":"https://script.google.com/macros/s/AKfycbwdeG03XknIH_bakpU91_Yc0KjH-q12EE1sa0oOtPVlfgzRIGGweUr4j3iAUttXyzYYqw/exec","startIntervalMinutes":30,"cancelPage":"/reservation/line-test/cancel/","cancelLinkTarget":null,"requireLineToken":true};
+const PEPEL_BOOKING_CONFIG = {"transport":"http","apiBase":"https://script.google.com/macros/s/AKfycbwdeG03XknIH_bakpU91_Yc0KjH-q12EE1sa0oOtPVlfgzRIGGweUr4j3iAUttXyzYYqw/exec","startIntervalMinutes":30,"cancelPage":"/reservation/line-test/cancel/","cancelLinkTarget":null,"requireLineToken":true,"lineContext":true};
 const PepelBookingApi = (function(config) {
     // visitExperience: the booking entrance answer (はじめて / 担当してもらったことがある), see booking_v3.js.
     const CONDITIONS = ['attributes','consultationContentChanged','visitExperience'];
     const GET = {menus:['visitExperience'], availability:['date','menuId','menuIds',...CONDITIONS], availabilityWeek:['startDate','menuId','menuIds','dates',...CONDITIONS]};
-    const CREATE = ['sourceType','requestVersion','requestId','resumeProof','menuId','menuIds','date','time','name','phone','customerRequests',...CONDITIONS,'confirmation','lineIdToken'];
+    const CREATE = ['sourceType','requestVersion','requestId','resumeProof','menuId','menuIds','date','time','name','phone','email','cancellationPolicyAccepted','customerRequests',...CONDITIONS,'confirmation','lineIdToken'];
     const RECEIPT = ['sourceType','action','requestId','resumeProof'];
     const POST = {inspect:RECEIPT, abandon:RECEIPT, cancelPreview:['sourceType','action','reservationId','cancelToken'], cancelReservation:['sourceType','action','reservationId','cancelToken','phone','reason']};
     const ID = /^[A-Za-z0-9_-]{22,128}$/;
@@ -327,7 +336,7 @@ const PepelBookingApi = (function(config) {
         if (!body || typeof body !== 'object' || Array.isArray(body) || body.sourceType !== 'WEB_PAGE') throw violation('post_source');
         if (body.action === undefined) {
             only(Object.keys(body), CREATE, 'create_keys');
-            if (body.requestVersion !== 2) throw violation('request_version');
+            if (body.requestVersion !== 3) throw violation('request_version');
             if (!ID.test(body.requestId || '') || !ID.test(body.resumeProof || '')) throw violation('request_identity');
             const c = body.confirmation;
             if (!c || typeof c !== 'object' || Object.keys(c).sort().join() !== 'certainty,finalDurationMinutes,totalMaxYen,totalMinYen') throw violation('confirmation');
@@ -409,6 +418,23 @@ const TOTAL_NOT_FIXED_TEXT = 'この組み合わせは料金がご来店時に�
 const NOT_BOOKABLE_TEXT = 'ご選択の内容は、WEBではご予約いただけません。LINEまたはお電話でお問い合わせください。';
 const BOOKABLE_STATES = ['ready_for_time_selection','allowed'];
 const conditions = {attributes:{}, consultationContentChanged:null};
+// Contact email (N13 8W, notification contract v2 §2.2/T2): required on the WEB page, optional inside LINE (reminders
+// go by LINE there). Format check only; the address is kept with this booking, never sent to the customer master.
+const emailInput = typeof document === 'undefined' ? null : document.getElementById('email');
+const EMAIL_REQUIRED = !PEPEL_BOOKING_CONFIG.lineContext;
+function contactEmail() { return emailInput ? emailInput.value.trim() : ''; }
+function validEmail(v) {
+    const at = v.indexOf('@');
+    if (!v || v.length > 254 || at < 1 || at !== v.lastIndexOf('@') || /[\s\u0000-\u001f\u007f]/.test(v)) return false;
+    const domain = v.slice(at + 1);
+    return at <= 64 && domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
+}
+function emailReady() { const v = contactEmail(); return v ? validEmail(v) : !EMAIL_REQUIRED; }
+const NOTIFICATION_PLAN_TEXT = {
+    EMAIL:'ご予約日の前日と当日に、ご入力のメールアドレスへお知らせをお送りします。',
+    LINE:'ご予約日の前日と当日に、LINEでお知らせをお送りします。',
+    NO_ROUTE:'このご予約には通知をお送りできません。予約番号と日時をお控えください。'
+};
 let shownConditionFields = [];
 let checkedEvaluation = null;
 // Booking entrance (owner decision 2026-10-19): a first-time user of this system answers before the
@@ -625,7 +651,7 @@ function lockForSubmit(message) {
     submitting = true; invalidateWeek(); requestId++;
     if (availabilityController) availabilityController.abort();
     resetTimes(message);
-    [menuSelect, dateInput, nameInput, phoneInput, requestsInput, policyInput].forEach(element => element.disabled = true);
+    [menuSelect, dateInput, nameInput, phoneInput, emailInput, requestsInput, policyInput].filter(Boolean).forEach(element => element.disabled = true);
     renderCalendar(); renderMenuCards(); renderFlow();
     loadingMsg.textContent = message; loadingMsg.style.display = 'block'; showNotice('');
 }
@@ -650,11 +676,17 @@ function showCompleted(data, p) {
         const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
         dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); details.appendChild(row);
     });
+    // What the customer is told about reminders comes from the commit (notificationPlan); NONE promises nothing.
+    const planText = NOTIFICATION_PLAN_TEXT[data.notificationPlan];
+    if (planText) {
+        const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+        dt.textContent = 'お知らせ'; dd.textContent = planText; row.appendChild(dt); row.appendChild(dd); details.appendChild(row);
+    }
     renderFlow(); document.getElementById('completedHeading').focus();
 }
 async function returnToForm(message, toMenu) {
     submitting = false; loadingMsg.style.display = 'none';
-    [menuSelect, dateInput, nameInput, phoneInput, requestsInput, policyInput].forEach(element => element.disabled = false);
+    [menuSelect, dateInput, nameInput, phoneInput, emailInput, requestsInput, policyInput].filter(Boolean).forEach(element => element.disabled = false);
     flowStep = toMenu || !selectedMenu() ? 'menu' : 'date';
     renderMenuCards();
     if (toMenu) await loadMenus();
@@ -685,9 +717,9 @@ async function submitReservation() {
     }
     if (!bookingRequest || bookingRequest.key !== reviewedSelection) bookingRequest = {requestId:randomId(), resumeProof:randomId(), key:reviewedSelection};
     const ids = selectedMenuIds(), e = checkedEvaluation;
-    const payload = {sourceType:'WEB_PAGE', requestVersion:2, requestId:bookingRequest.requestId, resumeProof:bookingRequest.resumeProof,
+    const payload = {sourceType:'WEB_PAGE', requestVersion:3, requestId:bookingRequest.requestId, resumeProof:bookingRequest.resumeProof,
         ...(ids.length === 1 ? {menuId:ids[0]} : {menuIds:ids}), date:dateInput.value, time:timeSelect.value, name:nameInput.value.trim(),
-        phone:normalizedPhone(phoneInput.value), customerRequests:customerRequests(), attributes:JSON.parse(JSON.stringify(conditions.attributes)),
+        phone:normalizedPhone(phoneInput.value), ...(contactEmail() ? {email:contactEmail()} : {}), cancellationPolicyAccepted:policyInput.checked === true, customerRequests:customerRequests(), attributes:JSON.parse(JSON.stringify(conditions.attributes)),
         ...(conditions.consultationContentChanged === null ? {} : {consultationContentChanged:conditions.consultationContentChanged}),
         ...(visitAsked && visitExperience ? {visitExperience} : {}),
         confirmation:{totalMinYen:e.pricing.total.minimumYen, totalMaxYen:e.pricing.total.maximumYen, certainty:e.pricing.total.certainty, finalDurationMinutes:e.duration.finalDurationMinutes}};
@@ -713,6 +745,218 @@ async function resumePending() {
     lockForSubmit('前回の送信結果を確認中...');
     showOutcome('前回の送信結果を確認しています（自動で再送はしません）：' + pendingLabel(p));
     return concludeBooking(await settle(p), p);
+}
+
+// Customer booking page: perceived speed (2026-10-21). Inlined after booking_v3.js by build.cjs; uses the
+// page's globals. The server stays the source of truth: nothing here books, decides availability or prices.
+//   - Menus: the last menus answer is kept in this browser (24 h) and shown at once; the server is always
+//     asked again in the background. A different answer is applied on the menu step (the selection is kept
+//     when still bookable); a selected menu that changed or closed is reported and has to be chosen again.
+//   - Week availability (display only): the current week is prefetched shortly after the menu selection
+//     settles, the next week after a week is shown. Answers are kept in memory for 60 s, identical requests
+//     share one call. The slot check (availability of the chosen day) and the booking are never cached.
+//   - Menu step: no totals (web-booking/README.md: 料金・所要時間は日時を選ぶと表示されます). The prefetched
+//     week only lets the menu step say at once when the engine refuses the selection (combination, store
+//     check) or needs conditions; prices and durations appear on the date step as before.
+//   - Back: each step is a history entry, so the browser / Android back button returns to the previous step
+//     with the selection kept instead of leaving the page.
+const PepelSpeed = (function() {
+    const MENU_MAX_AGE_MS = 24 * 60 * 60 * 1000, WEEK_TTL_MS = 60 * 1000, PREFETCH_DELAY_MS = 500;
+    const MENU_KEY = 'pepel-booking-menus-v1';
+    const store = {
+        read(key) { try { const all = JSON.parse(localStorage.getItem(MENU_KEY) || '{}'); return all[key] || null; } catch (_) { return null; } },
+        write(key, data) {
+            try { const all = JSON.parse(localStorage.getItem(MENU_KEY) || '{}'); all[key] = {at: Date.now(), data};
+                for (const k of Object.keys(all)) if (Date.now() - all[k].at > MENU_MAX_AGE_MS) delete all[k];
+                localStorage.setItem(MENU_KEY, JSON.stringify(all)); } catch (_) {}
+        },
+        clear() { try { localStorage.removeItem(MENU_KEY); } catch (_) {} }
+    };
+    // Who the menus answer is for: anonymous WEB, or the LINE user of this LIFF session (the token's subject,
+    // read only to separate cached answers on a shared device; the server verifies the token itself).
+    function identity() {
+        const token = typeof PepelLine !== 'undefined' && PepelLine.idToken;
+        if (!token) return 'web';
+        try { const sub = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub || '';
+            let h = 2166136261; for (const c of sub) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return 'line:' + h.toString(36);
+        } catch (_) { return 'line'; }
+    }
+    const lineReady = () => typeof PepelLine !== 'undefined' && PepelLine.ready ? PepelLine.ready : Promise.resolve();
+    const tokenMissing = () => PEPEL_BOOKING_CONFIG.requireLineToken && !(typeof PepelLine !== 'undefined' && PepelLine.idToken);
+    let menuStatus = null, menuStale = false, freshMenus = null;
+    // Background / shared requests do not use the caller's abort signal; they get their own time limit.
+    function limited(url, ms) {
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        const timer = controller ? setTimeout(() => controller.abort(), ms) : null;
+        return requestJSONBase(url, controller ? {signal: controller.signal} : {}).finally(() => clearTimeout(timer));
+    }
+    const weekCache = new Map(); // url -> {at, promise, data}
+    function status(text, kind) {
+        if (!menuStatus) return;
+        menuStatus.textContent = text || ''; menuStatus.hidden = !text; menuStatus.dataset.kind = kind || '';
+    }
+    // ---- menus ----
+    // The menus answer also says whether the server knows this visitor (askVisitExperience,
+    // visitExperienceKnown, visitExperience). That part decides the counseling and must never come from
+    // another visitor's answer: an anonymous WEB page asks the server first on every load and uses stored
+    // menus only after the server said it does not know the visitor (the answers per visit choice are then
+    // the same for everyone). A LINE page keys stored answers by its LINE user.
+    const VISIT_FIELDS = ['askVisitExperience', 'visitExperienceKnown', 'visitExperience'];
+    let anonymous = false;
+    const inflight = new Map();
+    function fetchMenus(url, key, options) {
+        if (inflight.has(url)) return inflight.get(url);
+        const p = (options ? requestJSONBase(url, options) : limited(url, 20000)).then(data => {
+            store.write(key, data);
+            if (!/[?&]visitExperience=/.test(url)) {
+                anonymous = identity() === 'web' && data.askVisitExperience === true && data.visitExperienceKnown !== true;
+                // While the visit question is on screen, fetch both answers' menus.
+                if (anonymous) for (const v of Object.keys(VISIT_LABEL)) { const u = url + '&visitExperience=' + v; fetchMenus(u, menuKey(u), null).catch(() => {}); }
+            }
+            return data;
+        }).finally(() => inflight.delete(url));
+        inflight.set(url, p);
+        return p;
+    }
+    const menuKey = url => PEPEL_BOOKING_CONFIG.apiBase + '|' + url.slice(url.indexOf('?')) + '|' + identity();
+    async function cachedMenus(url, options) {
+        await lineReady();
+        if (tokenMissing()) return requestJSONBase(url, options);
+        const key = menuKey(url), hit = store.read(key);
+        const servable = identity() !== 'web' || (anonymous && /[?&]visitExperience=/.test(url));
+        if (!servable || !hit || Date.now() - hit.at > MENU_MAX_AGE_MS) return inflight.get(url) || fetchMenus(url, key, options);
+        // Served from this browser: the cached answer itself when it was just confirmed (reapply), else refreshed.
+        if (freshMenus && freshMenus.key === key && freshMenus.json === JSON.stringify(hit.data)) { freshMenus = null; return hit.data; }
+        if (Date.now() - hit.at < 15000) return hit.data; // fetched moments ago (e.g. prefetched during the visit question)
+        status('最新のメニュー情報を確認しています…', 'checking');
+        fetchMenus(url, key, null).then(data => reconcile(key, hit.data, data), () => status('最新のメニュー情報を確認できませんでした。表示中のメニューで進めます（料金・空きはご予約時にお店のシステムで確認します）。', 'error'));
+        return hit.data;
+    }
+    function menuEntry(list, id) { return (list || []).find(m => m.id === id) || null; }
+    function sameMenu(a, b) { return !!a && !!b && a.bookable === b.bookable && a.webBookingEnabled === b.webBookingEnabled && a.name === b.name && a.price === b.price && a.durationMinutes === b.durationMinutes; }
+    function reconcile(key, shown, data) {
+        if (JSON.stringify(shown) === JSON.stringify(data)) { status('', ''); return; }
+        status('', '');
+        if (submitting || completed) return;
+        // The server now answers differently about who this visitor is: start the menu step again.
+        if (VISIT_FIELDS.some(f => shown[f] !== data[f])) {
+            if (flowStep !== 'menu') showStep('menu', false);
+            visitExperience = null; visitAsked = false;
+            reapply(key, data, [], false);
+            showNotice('ご来店の情報を確認しました。お手数ですが、もう一度お選びください。');
+            return;
+        }
+        const selected = selectedMenuIds(), changed = selected.filter(id => !sameMenu(menuEntry(shown.menus, id), menuEntry(data.menus, id)));
+        if (flowStep !== 'menu' && !changed.length) { menuStale = true; return; } // applied when the customer comes back to the menus
+        if (flowStep !== 'menu') showStep('menu', false);
+        reapply(key, data, selected.filter(id => !changed.includes(id)), changed.length > 0);
+    }
+    // Re-run the page's own menu loading with the fresh answer (served from memory, no new request), then
+    // restore the selection that is still bookable.
+    function reapply(key, data, keep, dropped) {
+        freshMenus = {key, json: JSON.stringify(data)};
+        Promise.resolve(loadMenus()).then(() => {
+            for (const id of keep) { const m = menuEntry(menus, id); if (m && m.bookable && m.webBookingEnabled) selectMenu(id, true); }
+            if (dropped) showNotice('選択中のメニューの受付内容が更新されました。メニューをご確認のうえ、選び直してください。');
+        });
+    }
+    // ---- week availability (display only) ----
+    function weekRequest(url) {
+        const hit = weekCache.get(url);
+        if (hit && (hit.data === undefined || Date.now() - hit.at < WEEK_TTL_MS)) return hit.promise;
+        const entry = {at: Date.now(), data: undefined};
+        entry.promise = limited(url, 30000).then(data => { entry.data = data; entry.at = Date.now(); return data; },
+            error => { if (weekCache.get(url) === entry) weekCache.delete(url); throw error; });
+        weekCache.set(url, entry);
+        return entry.promise;
+    }
+    function clearWeeks() { weekCache.clear(); }
+    function weekUrl(menuKey, start) { return GAS_WEB_APP_URL + '?action=availabilityWeek&startDate=' + encodeURIComponent(start) + menuQuery(menuKey); }
+    function requestJSON(url, options = {}) {
+        url = String(url);
+        const post = options && options.method && options.method.toUpperCase() === 'POST';
+        if (post || submitting) { clearWeeks(); return requestJSONBase(url, options); }
+        if (/[?&]action=menus(&|$)/.test(url)) return cachedMenus(url, options);
+        if (/[?&]action=availabilityWeek&/.test(url) && !/[?&]dates=/.test(url)) return weekRequest(url);
+        // The chosen day's check is always fresh; afterwards the week answers may be outdated.
+        if (/[?&]action=availability&/.test(url)) return requestJSONBase(url, options).finally(clearWeeks);
+        return requestJSONBase(url, options);
+    }
+    // ---- menu step summary from the prefetched week ----
+    let summaryEl = null, prefetchTimer = null, summaryKey = null;
+    // Shown only for a refusal or missing conditions; never a price or duration (menu step spec).
+    function renderSummary(state, text) {
+        if (!summaryEl) return;
+        const shown = state === 'blocked' || state === 'information';
+        summaryEl.hidden = !shown; summaryEl.dataset.state = state; if (!shown) text = '';
+        summaryEl.setAttribute('aria-busy', String(state === 'loading'));
+        summaryEl.textContent = text || '';
+    }
+    function summarize(data) {
+        const days = Object.entries(data && data.days || {}).filter(([date, day]) => date >= dateInput.min && day && day.status === 'success' && !day.isClosed && day.evaluation && validEvaluation(day.evaluation)).map(([, day]) => day.evaluation);
+        if (!days.length) return ['unknown', ''];
+        if (days.some(ev => evaluationReady(ev))) return ['ready', ''];
+        const ev = days[0];
+        if (ev.state === 'needs_information') return ['information', '次の画面で、ご希望の条件をお選びください。'];
+        return ['blocked', evaluationMessage(ev)];
+    }
+    function prefetchForMenus() {
+        clearTimeout(prefetchTimer);
+        const key = menuSelect.value;
+        if (!key || !selectedMenu() || submitting || completed) { summaryKey = null; renderSummary('none'); return; }
+        const start = mondayOf(dateInput.min), url = weekUrl(key, start);
+        summaryKey = url;
+        renderSummary('loading', '');
+        prefetchTimer = setTimeout(() => {
+            weekRequest(url).then(data => { if (summaryKey === url) renderSummary(...summarize(data)); },
+                () => { if (summaryKey === url) renderSummary('error', ''); });
+        }, PREFETCH_DELAY_MS);
+    }
+    function prefetchNextWeek() {
+        if (flowStep !== 'date' || !menuSelect.value || weekMenuId !== menuSelect.value || !weekDays.length) return;
+        weekRequest(weekUrl(menuSelect.value, addDays(weekStart, 7))).catch(() => {});
+    }
+    // ---- history: each step is an entry ----
+    let restoring = false;
+    function pushStep(step) {
+        if (restoring) return;
+        try { if (!history.state || history.state.pepelStep !== step) history.pushState({pepelStep: step}, ''); } catch (_) {}
+    }
+    function install() {
+        menuStatus = document.createElement('p'); menuStatus.id = 'menuStatus'; menuStatus.className = 'hint menu-status'; menuStatus.hidden = true;
+        menuStatus.setAttribute('role', 'status'); menuStatus.setAttribute('aria-live', 'polite');
+        summaryEl = document.createElement('p'); summaryEl.id = 'menuEvaluation'; summaryEl.className = 'menu-evaluation'; summaryEl.hidden = true;
+        summaryEl.setAttribute('role', 'status'); summaryEl.setAttribute('aria-live', 'polite');
+        menuCards.before(menuStatus); menuCards.after(summaryEl);
+        try { history.replaceState({pepelStep: 'menu'}, ''); } catch (_) {}
+        window.addEventListener('popstate', event => {
+            const step = event.state && event.state.pepelStep;
+            if (!step || submitting || completed) return;
+            restoring = true;
+            try { if (step === 'review') openReview(); else showStep(step); } finally { restoring = false; }
+            // A step that cannot be shown (e.g. nothing selected any more) keeps the history in line with the screen.
+            if (flowStep !== step) { try { history.replaceState({pepelStep: flowStep}, ''); } catch (_) {} }
+        });
+    }
+    return {requestJSON, install, prefetchForMenus, prefetchNextWeek, pushStep, clearWeeks,
+        menusStale: () => menuStale, clearMenuStale: () => { menuStale = false; }, _store: store, _weekCache: weekCache};
+})();
+// The page's own functions are wrapped (function declarations are hoisted, so they exist here).
+const requestJSONBase = requestJSON;
+requestJSON = (url, options) => PepelSpeed.requestJSON(url, options);
+{
+    const baseSelectMenu = selectMenu, baseShowStep = showStep, baseLoadWeek = loadWeek, baseLoadMenus = loadMenus;
+    selectMenu = function(id, toggle) { const r = baseSelectMenu(id, toggle); PepelSpeed.prefetchForMenus(); return r; };
+    showStep = function(step, focus) {
+        const before = flowStep;
+        const r = baseShowStep(step, focus);
+        if (flowStep === step && before !== step) PepelSpeed.pushStep(step);
+        if (flowStep === 'menu' && PepelSpeed.menusStale()) { PepelSpeed.clearMenuStale(); loadMenus(); }
+        return r;
+    };
+    loadWeek = async function(retryFailed) { const r = await baseLoadWeek(retryFailed); PepelSpeed.prefetchNextWeek(); return r; };
+    // After the menus are (re)loaded the selection is empty: the summary follows.
+    loadMenus = async function() { const r = await baseLoadMenus(); PepelSpeed.prefetchForMenus(); return r; };
 }
 
 const GAS_WEB_APP_URL = PEPEL_BOOKING_CONFIG.apiBase;
@@ -801,12 +1045,12 @@ function bookingReady() {
 }
 function customerRequests() { return requestsInput.value.replace(/\r\n?/g, '\n').trim(); }
 function customerDetailsReady() {
-    return !!nameInput.value.trim() && !!normalizedPhone(phoneInput.value) &&
+    return !!nameInput.value.trim() && !!normalizedPhone(phoneInput.value) && emailReady() &&
         requestsInput.value.length <= MAX_REQUESTS_LENGTH && policyInput.checked === true;
 }
 function reviewKey() {
     return JSON.stringify([selectionKey(), timeSelect.value, nameInput.value.trim(),
-        normalizedPhone(phoneInput.value), customerRequests(), policyInput.checked]);
+        normalizedPhone(phoneInput.value), contactEmail(), customerRequests(), policyInput.checked]);
 }
 function showStep(step, focus = true) {
     if (submitting || completed) return;
@@ -906,7 +1150,7 @@ function openReview() {
     const menu = selectedMenu();
     reviewDetails.replaceChildren();
     [...(visitExperience ? [['ご来店',VISIT_LABEL[visitExperience]]] : []),['メニュー',menu.name],['料金',priceLines(checkedEvaluation).join('\n')],['所要時間',durationText(checkedEvaluation)],
-        ['ご予約日時',dateInput.value + '　' + timeSelect.value + '〜' + endTimeOf(timeSelect.value, checkedEvaluation)],['お名前',nameInput.value.trim()],['電話番号',normalizedPhone(phoneInput.value)],
+        ['ご予約日時',dateInput.value + '　' + timeSelect.value + '〜' + endTimeOf(timeSelect.value, checkedEvaluation)],['お名前',nameInput.value.trim()],['電話番号',normalizedPhone(phoneInput.value)],['メールアドレス',contactEmail() || 'なし'],
         ...(customerRequests() ? [['ご要望など',customerRequests()]] : [])].forEach(([label,value]) => {
         const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
         dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); reviewDetails.appendChild(row);
@@ -1350,6 +1594,7 @@ menuSelect.addEventListener('change', () => selectMenu(menuSelect.value));
 timeSelect.addEventListener('change', updateSubmit);
 nameInput.addEventListener('input', updateSubmit);
 phoneInput.addEventListener('input', updateSubmit);
+emailInput.addEventListener('input', updateSubmit);
 requestsInput.addEventListener('input', updateSubmit);
 policyInput.addEventListener('change', updateSubmit);
 submitBtn.addEventListener('click', submitReservation);
@@ -1367,7 +1612,7 @@ function handOffCancellation() {
 }
 window.addEventListener('hashchange', handOffCancellation);
 if (handOffCancellation()) {}
-else { resetTimes('日付とメニューを選択してください'); renderCalendar(); loadMenus().then(resumePending); }
+else { resetTimes('日付とメニューを選択してください'); renderCalendar(); PepelSpeed.install(); loadMenus().then(resumePending); }
 
 </script>
 
