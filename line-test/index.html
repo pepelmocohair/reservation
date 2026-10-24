@@ -169,6 +169,12 @@
         .conditions fieldset label { display:flex; align-items:center; gap:6px; min-height:44px; }
         .schedule td.waiting { background:#f2efe8; }
         .visit-question .visit-options { display:grid; gap:10px; margin:0 0 14px; }
+        .visit-note { margin:-4px 0 4px; font-size:13px; color:#5c574c; }
+        .menu-card .card-note { font-size:13px; color:#4f4b42; margin-top:4px; }
+        .busy-overlay { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:rgba(250,249,246,.86); }
+        .busy-overlay[hidden] { display:none; }
+        .busy-box { display:flex; flex-direction:column; align-items:center; gap:4px; padding:20px 24px; max-width:300px; text-align:center; background:#fff; border:1px solid #d9d4c7; border-radius:10px; }
+        .busy-box p { margin:0; font-weight:600; }
         #menuPanel[data-visit="ask"] #menuHeading, #menuPanel[data-visit="ask"] #menuCards, #menuPanel[data-visit="ask"] #toDate,
         #menuPanel[data-visit="ask"] #menuEvaluation, #menuPanel[data-visit="ask"] #menuStatus { display:none; }
         .menu-status { margin:0 0 8px; }
@@ -198,11 +204,13 @@
         <div id="visitPanel" class="visit-question" hidden>
             <p id="visitHeading" class="step-label" tabindex="-1">pepel mocoで施術を受けたことはありますか？</p>
             <div class="visit-options" role="group" aria-labelledby="visitHeading">
-                <button type="button" class="btn visit-card" data-visit-choice="first">はじめて</button>
+                <button type="button" class="btn visit-card" data-visit-choice="first" aria-describedby="visitFirstHint">はじめて</button>
+                <p id="visitFirstHint" class="hint visit-note">はじめての方：対象メニューでは初回カウンセリング料として＋1,000円（30分）を頂いています。</p>
                 <button type="button" class="btn visit-card" data-visit-choice="returning">担当してもらったことがある</button>
             </div>
         </div>
         <div id="visitSummary" class="summary" hidden><p id="visitSummaryText"></p><button id="editVisit" type="button">ご来店経験を変更</button></div>
+        <p id="visitFirstNote" class="hint visit-note" hidden>対象メニューでは初回カウンセリング料として＋1,000円（30分）を頂いています。料金・所要時間は日時を選ぶと内訳で表示されます。</p>
         <p id="menuHeading" class="hint" tabindex="-1">ご希望のメニューを選択してください（複数選択可）。もう一度押すと解除できます。</p>
         <select id="menu" hidden disabled aria-label="メニュー"><option value="">メニューを読み込み中...</option></select>
         <div id="menuLoading" class="menu-loading" role="status"><p>メニューを読み込んでいます…</p></div>
@@ -252,7 +260,7 @@
         <p id="phoneHint" class="hint">国内の電話番号を入力してください。ハイフンあり・なし、どちらでも入力できます。</p>
         <label for="email">メールアドレス（任意）</label>
         <input type="email" id="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="example@example.com" aria-describedby="emailHint">
-        <p id="emailHint" class="hint">お知らせはLINEでお送りします。LINEで送れなかったときのために、メールアドレスも登録できます。</p>
+        <p id="emailHint" class="hint">ご予約日の前日19時ごろに、LINEでリマインドをお送りします。LINEで送れなかったときのために、メールアドレスも登録できます。<br>（開発環境のため、現在リマインドは送信していません）</p>
         <label for="customerRequests">メッセージ・ご要望があればどうぞ（任意）</label>
         <textarea id="customerRequests" rows="2" maxlength="100"></textarea>
         <section class="cancel-policy" aria-labelledby="cancelPolicyHeading">
@@ -430,11 +438,26 @@ function validEmail(v) {
     return at <= 64 && domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
 }
 function emailReady() { const v = contactEmail(); return v ? validEmail(v) : !EMAIL_REQUIRED; }
+// Customer reminder: the day before at 19:00 only (owner 2026-10-23; the same-day reminder is retired).
 const NOTIFICATION_PLAN_TEXT = {
-    EMAIL:'ご予約日の前日と当日に、ご入力のメールアドレスへお知らせをお送りします。',
-    LINE:'ご予約日の前日と当日に、LINEでお知らせをお送りします。',
+    EMAIL:'ご予約日の前日19時ごろに、ご入力のメールアドレスへリマインドをお送りします。',
+    LINE:'ご予約日の前日19時ごろに、LINEでリマインドをお送りします。',
     NO_ROUTE:'このご予約には通知をお送りできません。予約番号と日時をお控えください。'
 };
+// One short line per menu card, only from the store-confirmed menu details (FC-1 §5.1 M1). Prices, durations and
+// eligibility stay with the master and the engine; a menu without a line here shows none.
+const MENU_NOTES = Object.freeze({
+    PM0001:'前髪・刈り上げ調整、シャンプー・仕上げ込み', PM0002:'カットと顔剃りのセット', PM0003:'未就学児〜小学6年生。前髪・刈り上げ調整込み',
+    PM0004:'前髪だけのカット（シャンプーなし）', PM0005:'刈り上げ部分だけを整えます', PM0006:'伸びた根元だけを染めます。白髪染め対応',
+    PM0007:'髪全体を染めます。白髪染め対応', PM0008:'ヘナで染め、店内で仕上げまで行います', PM0009:'ヘナを塗布し、ご自宅で洗い流します',
+    PM0010:'部分的に明るさ・立体感を出します', PM0011:'脱色だけで髪を明るくします', PM0012:'ブリーチ後に色を入れます',
+    PM0013:'デジタルパーマでカールをつけます（カットは別）', PM0014:'カール・動き・ボリュームをつけます（カットは別）', PM0015:'前髪やトップなど一部分に動きをつけます',
+    PM0016:'サイドや襟足の浮き・膨らみを抑えます（カットは別）', PM0017:'髪全体のくせ・うねりを整えます', PM0018:'短い髪全体のくせを整えます',
+    PM0019:'前髪だけのくせを整えます', PM0020:'頭皮と毛先を同時にケアします', PM0021:'髪の補修を重点的に行います',
+    PM0022:'洗髪と顔剃り。乾かし・仕上げ込み', PM0023:'顔剃り後に炭酸パックとヘッドスパ。シャンプー・仕上げ込み', PM0024:'頭皮を重点的にケアします',
+    PM0025:'顔を剃って整えます'
+});
+function menuNote(id) { return Object.hasOwn(MENU_NOTES, id) ? MENU_NOTES[id] : ''; }
 let shownConditionFields = [];
 let checkedEvaluation = null;
 // Booking entrance (owner decision 2026-10-19): a first-time user of this system answers before the
@@ -453,6 +476,8 @@ function renderVisit(ask) {
     document.getElementById('menuPanel').setAttribute('data-visit', ask ? 'ask' : 'answered');
     document.getElementById('visitSummary').hidden = ask || !visitAsked;
     document.getElementById('visitSummaryText').textContent = visitAsked && visitExperience ? 'ご来店：' + VISIT_LABEL[visitExperience] : '';
+    // The counseling fee is the engine's (target menus only); the note never appears for returning customers.
+    document.getElementById('visitFirstNote').hidden = ask || !visitAsked || visitExperience !== 'first';
     if (ask) menuDetails.textContent = 'はじめに、ご来店経験を選んでください。';
 }
 function chooseVisit(value) {
@@ -653,8 +678,22 @@ function lockForSubmit(message) {
     resetTimes(message);
     [menuSelect, dateInput, nameInput, phoneInput, emailInput, requestsInput, policyInput].filter(Boolean).forEach(element => element.disabled = true);
     renderCalendar(); renderMenuCards(); renderFlow();
+    submitBtn.disabled = true; // the first tap locks the button until the outcome is known
     loadingMsg.textContent = message; loadingMsg.style.display = 'block'; showNotice('');
+    showBusy(message);
 }
+// Full-screen progress while a booking is confirmed or its outcome inquired (no tap reaches the form meanwhile).
+function showBusy(message) {
+    let o = document.getElementById('busyOverlay');
+    if (!o) {
+        o = document.createElement('div'); o.id = 'busyOverlay'; o.className = 'busy-overlay'; o.setAttribute('role', 'status'); o.setAttribute('aria-live', 'polite');
+        const box = document.createElement('div'), spin = document.createElement('div'), text = document.createElement('p');
+        box.className = 'busy-box'; spin.className = 'spinner'; text.id = 'busyText';
+        box.appendChild(spin); box.appendChild(text); o.appendChild(box); document.body.appendChild(o);
+    }
+    document.getElementById('busyText').textContent = message; o.hidden = false;
+}
+function hideBusy() { const o = document.getElementById('busyOverlay'); if (o) o.hidden = true; }
 function showCompleted(data, p) {
     forgetPending(); bookingRequest = null; showOutcome('');
     const link = document.getElementById('cancelLink'), hint = document.getElementById('cancelLinkHint');
@@ -670,7 +709,7 @@ function showCompleted(data, p) {
         hint.textContent = data.cancelTokenAvailable === false ? 'この画面ではキャンセル用リンクを再表示できません。キャンセルが必要な場合は、店舗へLINEまたはお電話でご連絡ください。' : 'キャンセルが必要な場合は、店舗へLINEまたはお電話でご連絡ください。';
         hint.hidden = false;
     }
-    completed = true; submitting = false; loadingMsg.style.display = 'none';
+    completed = true; submitting = false; loadingMsg.style.display = 'none'; hideBusy();
     const details = document.getElementById('completedDetails'); details.replaceChildren();
     [['予約ID', data.reservationId], ['予約したメニュー', p.menuName], ['予約日時', p.date + '　' + p.time]].forEach(([label, value]) => {
         const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
@@ -685,7 +724,7 @@ function showCompleted(data, p) {
     renderFlow(); document.getElementById('completedHeading').focus();
 }
 async function returnToForm(message, toMenu) {
-    submitting = false; loadingMsg.style.display = 'none';
+    submitting = false; loadingMsg.style.display = 'none'; hideBusy();
     [menuSelect, dateInput, nameInput, phoneInput, emailInput, requestsInput, policyInput].filter(Boolean).forEach(element => element.disabled = false);
     flowStep = toMenu || !selectedMenu() ? 'menu' : 'date';
     renderMenuCards();
@@ -724,7 +763,7 @@ async function submitReservation() {
         ...(visitAsked && visitExperience ? {visitExperience} : {}),
         confirmation:{totalMinYen:e.pricing.total.minimumYen, totalMaxYen:e.pricing.total.maximumYen, certainty:e.pricing.total.certainty, finalDurationMinutes:e.duration.finalDurationMinutes}};
     const p = {requestId:payload.requestId, resumeProof:payload.resumeProof, date:payload.date, time:payload.time, menuName:selectedMenu().name};
-    lockForSubmit('予約を送信中...');
+    lockForSubmit('予約を確定しています…');
     rememberPending(p); // before sending: a reload or another tab continues the inquiry
     let data;
     try { data = await callBooking(payload); }
@@ -733,7 +772,7 @@ async function submitReservation() {
         return returnToForm('予約画面の設定に問題があるため、送信していません。画面を更新してください。', false);
     }
     if (uncertainResult(data)) {
-        loadingMsg.textContent = '送信結果を確認中...';
+        loadingMsg.textContent = '送信結果を確認中...'; showBusy('予約が確定したか確認しています…（自動で再送はしません）');
         showOutcome('送信結果を確認しています（自動で再送はしません）：' + pendingLabel(p));
         data = await settle(p);
     }
@@ -1113,7 +1152,9 @@ function renderMenuCards() {
         meta.textContent = menu.price + ' / ' + (Number.isInteger(menu.durationMinutes) ? menu.durationMinutes + '分' : '所要時間設定中');
         const state = document.createElement('span'); state.className = 'card-meta';
         state.textContent = !menu.bookable ? 'WEB予約受付準備中' : selectedMenuIds().includes(menu.id) ? '✓ 選択中（押すと解除）' : '選択する';
-        button.appendChild(name); button.appendChild(meta); button.appendChild(state);
+        button.appendChild(name);
+        if (menuNote(menu.id)) { const note = document.createElement('span'); note.className = 'card-note'; note.textContent = menuNote(menu.id); button.appendChild(note); }
+        button.appendChild(meta); button.appendChild(state);
         button.addEventListener('click', () => selectMenu(menu.id, true));
         groups.get(menu.category).appendChild(button);
     });
