@@ -175,6 +175,9 @@
         .busy-overlay[hidden] { display:none; }
         .busy-box { display:flex; flex-direction:column; align-items:center; gap:4px; padding:20px 24px; max-width:300px; text-align:center; background:#fff; border:1px solid #d9d4c7; border-radius:10px; }
         .busy-box p { margin:0; font-weight:600; }
+        .schedule td button.gap-start { font-size:13px; font-weight:600; letter-spacing:0; }
+        .schedule td.multi button { display:block; height:22px; min-height:22px; font-size:15px; }
+        .schedule td.multi button.gap-start { font-size:12px; }
         #menuPanel[data-visit="ask"] #menuHeading, #menuPanel[data-visit="ask"] #menuCards, #menuPanel[data-visit="ask"] #toDate,
         #menuPanel[data-visit="ask"] #menuEvaluation, #menuPanel[data-visit="ask"] #menuStatus { display:none; }
         .menu-status { margin:0 0 8px; }
@@ -1231,11 +1234,13 @@ function invalidateWeek() {
     renderFlow();
 }
 // slotMinutes remains the ten-minute internal unit. Start times have a separate grid.
-function isCustomerStartTime(time) { return typeof time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time) &&
-    (Number(time.slice(0,2)) * 60 + Number(time.slice(3))) % PEPEL_BOOKING_CONFIG.startIntervalMinutes === 0; }
+function isCustomerStartTime(time) { return typeof time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]0$/.test(time); }
+function startMinutes(time) { return Number(time.slice(0,2)) * 60 + Number(time.slice(3)); }
+function isGridStart(time) { return isCustomerStartTime(time) && startMinutes(time) % PEPEL_BOOKING_CONFIG.startIntervalMinutes === 0; }
+function gridRowOf(time) { const step = PEPEL_BOOKING_CONFIG.startIntervalMinutes, m = Math.floor(startMinutes(time) / step) * step; return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0'); }
 function customerAvailability(data) {
     // Version 17 responses may still contain ten-minute candidates during rollout.
-    // Keep only API-authorized starts on the configured grid; never round or synthesize candidates.
+    // Keep only API-authorized starts (grid and gap-fill); never round or synthesize candidates.
     return {...data, availableStartTimes:[...new Set(data.availableStartTimes.filter(isCustomerStartTime))]};
 }
 function validAvailability(data, date, menuId) {
@@ -1268,7 +1273,7 @@ function renderWeek() {
     const times = new Set();
     weekDays.forEach(day => {
         if (!day.data) return;
-        day.data.availableStartTimes.forEach(time => times.add(time));
+        day.data.availableStartTimes.forEach(time => times.add(gridRowOf(time)));
         const toMinutes = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) ? Number(value.slice(0,2))*60+Number(value.slice(3)) : null;
         const start = toMinutes(day.data.openingTime), end = toMinutes(day.data.closingTime);
         if (start !== null && end !== null) {
@@ -1277,7 +1282,7 @@ function renderWeek() {
         }
     });
     const body = document.createElement('tbody');
-    const labels = [...times].filter(isCustomerStartTime).sort();
+    const labels = [...times].filter(isGridStart).sort();
     if (!labels.length) labels.push('—');
     labels.forEach(time => {
         const row = document.createElement('tr'), label = document.createElement('th');
@@ -1285,15 +1290,21 @@ function renderWeek() {
         weekDays.forEach(day => {
             const cell = document.createElement('td');
             const past = day.date < dateInput.min;
-            const canBook = !past && day.data && !day.data.isClosed && day.data.availableStartTimes.includes(time);
+            const slotTimes = !past && day.data && !day.data.isClosed ? day.data.availableStartTimes.filter(t => gridRowOf(t) === time).sort() : [];
+            const canBook = slotTimes.length > 0;
             if (canBook) {
-                const button = document.createElement('button'); button.type = 'button'; button.textContent = '◎';
-                button.disabled = submitting || !!pendingSlot || weekMenuId !== menuSelect.value;
-                button.setAttribute('aria-label', day.date + ' ' + time + ' 予約可能');
-                button.setAttribute('aria-pressed', String(pendingSlot ? pendingSlot.date === day.date && pendingSlot.time === time : dateInput.value === day.date && timeSelect.value === time));
-                const version = weekVersion;
-                button.addEventListener('click', () => selectWeekSlot(day.date, time, version));
-                cell.appendChild(button);
+                // ◎ for the row's own start; a gap-fill start inside the row shows its time (e.g. 12:40).
+                if (slotTimes.length > 1) cell.className = 'multi';
+                slotTimes.forEach(slotTime => {
+                    const button = document.createElement('button'); button.type = 'button'; button.textContent = slotTime === time ? '◎' : slotTime;
+                    if (slotTime !== time) button.className = 'gap-start';
+                    button.disabled = submitting || !!pendingSlot || weekMenuId !== menuSelect.value;
+                    button.setAttribute('aria-label', day.date + ' ' + slotTime + ' 予約可能');
+                    button.setAttribute('aria-pressed', String(pendingSlot ? pendingSlot.date === day.date && pendingSlot.time === slotTime : dateInput.value === day.date && timeSelect.value === slotTime));
+                    const version = weekVersion;
+                    button.addEventListener('click', () => selectWeekSlot(day.date, slotTime, version));
+                    cell.appendChild(button);
+                });
             } else {
                 const waiting = !past && day.data && day.data.evaluation.state === 'needs_information';
                 cell.className = waiting ? 'unknown waiting' : past || day.data ? 'unavailable' : 'unknown';
