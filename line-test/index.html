@@ -181,6 +181,8 @@
         #menuPanel[data-visit="ask"] #menuHeading, #menuPanel[data-visit="ask"] #menuCards, #menuPanel[data-visit="ask"] #toDate,
         #menuPanel[data-visit="ask"] #menuEvaluation, #menuPanel[data-visit="ask"] #menuStatus { display:none; }
         .menu-status { margin:0 0 8px; }
+        .menu-card.not-eligible { opacity:.55; background:#f4f2ec; }
+        .menu-card.not-eligible span:last-child { color:#6b4a00; }
         .menu-status[data-kind="error"] { color:#6b4a00; }
         .menu-evaluation:not([hidden]) { display:block; margin:10px 0 0; padding:10px 12px; border:1px solid #d9d4c7; border-radius:8px; background:#fff; font-size:14px; }
         .menu-evaluation[data-state="loading"] { color:#6b6457; }
@@ -303,6 +305,7 @@
 </div>
 
 
+<script>(function(){var B="1c88dfd971033a2a";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -317,11 +320,11 @@
 // with its requestId/resumeProof, the D01 conditions, and the v44 inspect/abandon receipt calls.
 // Anything else is refused before it is sent. The adapter never adds fields, retries or writes.
 // Transports: 'http' (fetch) for static hosts, or 'gas' (google.script.run) when hosted by GAS.
-const PEPEL_BOOKING_CONFIG = {"transport":"http","apiBase":"https://script.google.com/macros/s/AKfycbwdeG03XknIH_bakpU91_Yc0KjH-q12EE1sa0oOtPVlfgzRIGGweUr4j3iAUttXyzYYqw/exec","startIntervalMinutes":30,"cancelPage":"/reservation/line-test/cancel/","cancelLinkTarget":null,"requireLineToken":true,"lineContext":true};
+const PEPEL_BOOKING_CONFIG = {"transport":"http","apiBase":"https://script.google.com/macros/s/AKfycbwdeG03XknIH_bakpU91_Yc0KjH-q12EE1sa0oOtPVlfgzRIGGweUr4j3iAUttXyzYYqw/exec","startIntervalMinutes":30,"cancelPage":"/reservation/line-test/cancel/","cancelLinkTarget":null,"requireLineToken":true,"lineContext":true,"askVisitFirst":false,"catalogUrl":"menus.json"};
 const PepelBookingApi = (function(config) {
     // visitExperience: the booking entrance answer (はじめて / 担当してもらったことがある), see booking_v3.js.
     const CONDITIONS = ['attributes','consultationContentChanged','visitExperience'];
-    const GET = {menus:['visitExperience'], availability:['date','menuId','menuIds',...CONDITIONS], availabilityWeek:['startDate','menuId','menuIds','dates',...CONDITIONS]};
+    const GET = {menus:['visitExperience','startDate'], availability:['date','menuId','menuIds',...CONDITIONS], availabilityWeek:['startDate','menuId','menuIds','dates',...CONDITIONS]};
     const CREATE = ['sourceType','requestVersion','requestId','resumeProof','menuId','menuIds','date','time','name','phone','email','cancellationPolicyAccepted','customerRequests',...CONDITIONS,'confirmation','lineIdToken'];
     const RECEIPT = ['sourceType','action','requestId','resumeProof'];
     const POST = {inspect:RECEIPT, abandon:RECEIPT, cancelPreview:['sourceType','action','reservationId','cancelToken'], cancelReservation:['sourceType','action','reservationId','cancelToken','phone','reason']};
@@ -398,6 +401,7 @@ const PepelBookingApi = (function(config) {
     });
 })(PEPEL_BOOKING_CONFIG);
 
+const PEPEL_MENU_CATALOG = {"schema":"pepel-menu-catalog-v1","version":"5d761000c17fb22d","menus":[{"id":"PM0001","category":"CUT","name":"カット","price":"¥3,800","durationMinutes":60,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":1},{"id":"PM0002","category":"CUT","name":"カット＋シェービング","price":"¥4,800","durationMinutes":90,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":2},{"id":"PM0003","category":"CUT","name":"幼〜小学生カット","price":"¥2,800","durationMinutes":50,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":3},{"id":"PM0004","category":"CUT","name":"前髪カット","price":"¥500","durationMinutes":10,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":4,"requiresTreatmentHistory":true},{"id":"PM0005","category":"CUT","name":"刈り上げメンテ","price":"¥2,300","durationMinutes":30,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":5,"requiresTreatmentHistory":true},{"id":"PM0006","category":"COLOR","name":"カラーリタッチ 根本染め","price":"¥5,000","durationMinutes":90,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":6},{"id":"PM0007","category":"COLOR","name":"フルカラー 全体染め","price":"¥5,500〜","durationMinutes":110,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":7},{"id":"PM0008","category":"COLOR","name":"ヘナ染め","price":"¥7,000〜","durationMinutes":110,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":8},{"id":"PM0009","category":"COLOR","name":"ヘナ染め 塗布のみ","price":"¥2,500〜","durationMinutes":30,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":9,"requiresTreatmentHistory":true},{"id":"PM0010","category":"COLOR","name":"ハイライトのみ","price":"¥7,000〜","durationMinutes":90,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":10},{"id":"PM0011","category":"COLOR","name":"ブリーチ","price":"¥6,000〜","durationMinutes":90,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":11},{"id":"PM0012","category":"COLOR","name":"ダブルカラー","price":"¥12,000〜","durationMinutes":180,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":12},{"id":"PM0013","category":"PERM","name":"デジタルパーマ","price":"¥12,500〜","durationMinutes":150,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":13},{"id":"PM0014","category":"PERM","name":"パーマ","price":"¥6,500〜","durationMinutes":120,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":14},{"id":"PM0015","category":"PERM","name":"ポイントパーマ","price":"¥4,000〜","durationMinutes":60,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":15},{"id":"PM0016","category":"PERM","name":"���ウンパーマ","price":"¥4,500〜","durationMinutes":50,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":16},{"id":"PM0017","category":"STRAIGHT","name":"縮毛矯正 ストレートパーマ","price":"¥12,500〜","durationMinutes":150,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":17},{"id":"PM0018","category":"STRAIGHT","name":"メンズショートストレート","price":"¥9,800","durationMinutes":100,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":18},{"id":"PM0019","category":"STRAIGHT","name":"前髪ストレート","price":"¥4,000〜","durationMinutes":50,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":19},{"id":"PM0020","category":"TREATMENT","name":"ハーブミルクトリートメント&ヘッドスパ","price":"¥4,500","durationMinutes":60,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":20},{"id":"PM0021","category":"TREATMENT","name":"フローディアトリートメント","price":"¥2,500","durationMinutes":30,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":21},{"id":"PM0022","category":"SHAMPOO / BLOW","name":"シャンプー＆シェービング","price":"¥3,000","durationMinutes":40,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":22},{"id":"PM0023","category":"HEADSPA&OTHER","name":"シェービングと炭酸パックとヘッドスパ","price":"¥5,500","durationMinutes":60,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":23},{"id":"PM0024","category":"HEADSPA&OTHER","name":"クリームアロマヘッドスパ","price":"¥4,500","durationMinutes":60,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":24},{"id":"PM0025","category":"HEADSPA&OTHER","name":"フェイスシェービング／顔剃り","price":"¥2,000","durationMinutes":30,"webBookingEnabled":true,"bookable":true,"unavailableReason":null,"sortOrder":25}]};
 // Customer WEB booking additions (inlined after the adapter by build.cjs; uses the page's globals).
 // IP-2 2D (front request ID and outcome inquiry) and 3E (conditions and server results):
 //   - Prices and durations shown are the common evaluation engine's results returned by the API
@@ -427,6 +431,9 @@ const REASON_TEXT = {
 const STORE_CHECK_TEXT = 'ご予約の条件を店舗で確認する必要があります。LINEまたはお電話でお問い合わせください。';
 const TOTAL_NOT_FIXED_TEXT = 'この組み合わせは料金がご来店時に確定するため、現在WEBではご予約いただけません。LINEまたはお電話でお問い合わせください。';
 const NOT_BOOKABLE_TEXT = 'ご選択の内容は、WEBではご予約いただけません。LINEまたはお電話でお問い合わせください。';
+// A menu this customer cannot book (server answer: not listed for this customer, or no bookable day for a reason other
+// than a closed day). The card stays in the list, dimmed (owner 2026-10-25).
+const CUSTOMER_NOT_ELIGIBLE_TEXT = 'このメニューはご予約いただけません。店舗へお問い合わせください。';
 const BOOKABLE_STATES = ['ready_for_time_selection','allowed'];
 const conditions = {attributes:{}, consultationContentChanged:null};
 // Contact email (N13 8W, notification contract v2 §2.2/T2): required on the WEB page, optional inside LINE (reminders
@@ -802,8 +809,19 @@ async function resumePending() {
 //     check) or needs conditions; prices and durations appear on the date step as before.
 //   - Back: each step is a history entry, so the browser / Android back button returns to the previous step
 //     with the selection kept instead of leaving the page.
+// 2026-10-25 (docs/CUSTOMER_SPEED_20261025.md):
+//   - Static catalogue (web-booking/menu_catalog.cjs; built into the page, and on a static host also menus.json):
+//     the menu list is drawn at once from it while the server is asked. The server answer (same catalogVersion
+//     when the copy is current) always replaces it; a menu this customer cannot book (treatment history, prior
+//     consultation, a total fixed only at the store: weekBundle selectable=false) stays in the list, dimmed, with
+//     CUSTOMER_NOT_ELIGIBLE_TEXT. A tap that came before the answer is undone with the same text.
+//   - askVisitFirst (the anonymous WEB page): the visit question is shown at once and both answers' menus are
+//     asked for at once.
+//   - Every menus request carries the shown week (startDate): the answer's weekBundle is the server's own
+//     availabilityWeek answer for each listed menu alone, so choosing one menu shows its week without a request
+//     (display only, kept 5 minutes; the chosen day's check and the booking still ask the server).
 const PepelSpeed = (function() {
-    const MENU_MAX_AGE_MS = 24 * 60 * 60 * 1000, WEEK_TTL_MS = 60 * 1000, PREFETCH_DELAY_MS = 500;
+    const MENU_MAX_AGE_MS = 24 * 60 * 60 * 1000, WEEK_TTL_MS = 60 * 1000, PREFETCH_DELAY_MS = 500, BUNDLE_TTL_MS = 5 * 60 * 1000;
     const MENU_KEY = 'pepel-booking-menus-v1';
     const store = {
         read(key) { try { const all = JSON.parse(localStorage.getItem(MENU_KEY) || '{}'); return all[key] || null; } catch (_) { return null; } },
@@ -837,73 +855,158 @@ const PepelSpeed = (function() {
         if (!menuStatus) return;
         menuStatus.textContent = text || ''; menuStatus.hidden = !text; menuStatus.dataset.kind = kind || '';
     }
+    // ---- static catalogue ----
+    // The build's copy (PEPEL_MENU_CATALOG), replaced by catalogUrl (menus.json beside a static page, always
+    // revalidated) when that answers within 400 ms. Display only: the server answer replaces it.
+    const validCatalog = c => !!c && c.schema === 'pepel-menu-catalog-v1' && typeof c.version === 'string' && Array.isArray(c.menus) &&
+        c.menus.every(m => m && typeof m.id === 'string' && typeof m.name === 'string' && typeof m.category === 'string' && typeof m.price === 'string' && typeof m.bookable === 'boolean');
+    let catalog = typeof PEPEL_MENU_CATALOG !== 'undefined' && validCatalog(PEPEL_MENU_CATALOG) ? PEPEL_MENU_CATALOG : null;
+    const catalogReady = !PEPEL_BOOKING_CONFIG.catalogUrl || typeof fetch !== 'function' ? Promise.resolve() : Promise.race([
+        fetch(PEPEL_BOOKING_CONFIG.catalogUrl, {cache: 'no-cache', credentials: 'omit'}).then(r => r.ok ? r.json() : null)
+            .then(c => { if (validCatalog(c)) catalog = c; }, () => {}),
+        new Promise(resolve => setTimeout(resolve, 400))]);
     // ---- menus ----
     // The menus answer also says whether the server knows this visitor (askVisitExperience,
     // visitExperienceKnown, visitExperience). That part decides the counseling and must never come from
     // another visitor's answer: an anonymous WEB page asks the server first on every load and uses stored
     // menus only after the server said it does not know the visitor (the answers per visit choice are then
-    // the same for everyone). A LINE page keys stored answers by its LINE user.
+    // the same for everyone). A LINE page keys stored answers by its LINE user. askVisitFirst (the anonymous
+    // WEB deployment, where no visitor is ever identified) skips that first question to the server.
     const VISIT_FIELDS = ['askVisitExperience', 'visitExperienceKnown', 'visitExperience'];
-    let anonymous = false;
-    const inflight = new Map();
+    let anonymous = !!PEPEL_BOOKING_CONFIG.askVisitFirst;
+    const inflight = new Map(), bundles = new Map(); // visit -> {at, bundle} (week of every menu, from menus answers)
+    const shownWeek = () => mondayOf(dateInput.min);
+    // One form per menus request, so the prefetch and the page's own request share one call.
+    function menusUrl(visit) { return GAS_WEB_APP_URL + '?action=menus' + (visit ? '&visitExperience=' + encodeURIComponent(visit) : '') + '&startDate=' + shownWeek(); }
+    function menusUrlOf(url) { const v = /[?&]visitExperience=([a-z]+)/.exec(url); return menusUrl(v ? v[1] : null); }
     function fetchMenus(url, key, options) {
         if (inflight.has(url)) return inflight.get(url);
         const p = (options ? requestJSONBase(url, options) : limited(url, 20000)).then(data => {
             store.write(key, data);
+            if (data && data.weekBundle && typeof data.weekBundle === 'object') bundles.set(data.visitExperience || '', {at: Date.now(), bundle: data.weekBundle});
             if (!/[?&]visitExperience=/.test(url)) {
                 anonymous = identity() === 'web' && data.askVisitExperience === true && data.visitExperienceKnown !== true;
                 // While the visit question is on screen, fetch both answers' menus.
-                if (anonymous) for (const v of Object.keys(VISIT_LABEL)) { const u = url + '&visitExperience=' + v; fetchMenus(u, menuKey(u), null).catch(() => {}); }
+                if (anonymous) prefetchVisits();
             }
             return data;
         }).finally(() => inflight.delete(url));
         inflight.set(url, p);
         return p;
     }
+    function prefetchVisits() { for (const v of Object.keys(VISIT_LABEL)) { const u = menusUrl(v); fetchMenus(u, menuKey(u), null).catch(() => {}); } }
     const menuKey = url => PEPEL_BOOKING_CONFIG.apiBase + '|' + url.slice(url.indexOf('?')) + '|' + identity();
+    // An answer drawn from the static catalogue while the server is asked (provisional; never stored).
+    function provisional(url, ask) {
+        const v = /[?&]visitExperience=([a-z]+)/.exec(url);
+        return {status: 'success', slotMinutes: 10, startIntervalMinutes: PEPEL_BOOKING_CONFIG.startIntervalMinutes, askVisitExperience: ask,
+            visitExperience: v ? v[1] : null, visitExperienceKnown: false, catalogVersion: catalog.version, menus: catalog.menus, provisional: true};
+    }
+    // What the page lists: the server's menus; a menu this customer cannot book is kept, dimmed (not selectable).
+    // With the same catalogue version, a WEB menu the server left out for this customer (treatment history) is
+    // shown the same way; with another version the server's list alone is shown.
+    function present(data) {
+        if (!data || !Array.isArray(data.menus) || data.provisional) return data;
+        const week = data.weekBundle && data.weekBundle.menus || {};
+        const notEligible = m => ({...m, bookable: false, unavailableReason: 'customer_not_eligible'});
+        let list = data.menus.map(m => m.bookable && week[m.id] && week[m.id].selectable === false ? notEligible(m) : m);
+        if (catalog && data.catalogVersion === catalog.version && data.visitExperience) {
+            const byId = new Map(list.map(m => [m.id, m]));
+            list = [...catalog.menus.map(c => byId.get(c.id) || (c.webBookingEnabled === true ? notEligible(c) : null)).filter(Boolean),
+                ...list.filter(m => !catalog.menus.some(c => c.id === m.id))];
+        }
+        return {...data, menus: list};
+    }
     async function cachedMenus(url, options) {
-        await lineReady();
+        url = menusUrlOf(url);
+        const visit = /[?&]visitExperience=/.test(url);
+        await catalogReady;
+        // askVisitFirst: no visitor is known on this page; ask at once and fetch both answers meanwhile.
+        if (PEPEL_BOOKING_CONFIG.askVisitFirst && anonymous && !visit && catalog) { prefetchVisits(); return provisional(url, true); }
+        await lineReady(); // LIFF only (the LINE user keys the stored answers); never the server
         if (tokenMissing()) return requestJSONBase(url, options);
         const key = menuKey(url), hit = store.read(key);
-        const servable = identity() !== 'web' || (anonymous && /[?&]visitExperience=/.test(url));
-        if (!servable || !hit || Date.now() - hit.at > MENU_MAX_AGE_MS) return inflight.get(url) || fetchMenus(url, key, options);
+        const servable = identity() !== 'web' || (anonymous && visit);
+        if (!servable || !hit || Date.now() - hit.at > MENU_MAX_AGE_MS) {
+            // Without a stored answer the static catalogue is drawn at once — except for the first, visit-deciding
+            // question of a WEB page that cannot tell whether the server will ask it.
+            if (catalog && (visit || identity() !== 'web')) {
+                const shown = provisional(url, false);
+                status('ご予約いただけるメニューを確認しています…', 'checking');
+                (inflight.get(url) || fetchMenus(url, key, null)).then(data => reconcile(key, shown, present(data)),
+                    () => status('最新のメニュー情報を確認できませんでした。表示中のメニューで進めます（料金・空きはご予約時にお店のシステムで確認します）。', 'error'));
+                return shown;
+            }
+            return present(await (inflight.get(url) || fetchMenus(url, key, options)));
+        }
         // Served from this browser: the cached answer itself when it was just confirmed (reapply), else refreshed.
-        if (freshMenus && freshMenus.key === key && freshMenus.json === JSON.stringify(hit.data)) { freshMenus = null; return hit.data; }
-        if (Date.now() - hit.at < 15000) return hit.data; // fetched moments ago (e.g. prefetched during the visit question)
+        if (freshMenus && freshMenus.key === key && freshMenus.json === JSON.stringify(present(hit.data))) { freshMenus = null; return present(hit.data); }
+        if (Date.now() - hit.at < 15000) return present(hit.data); // fetched moments ago (e.g. prefetched during the visit question)
         status('最新のメニュー情報を確認しています…', 'checking');
-        fetchMenus(url, key, null).then(data => reconcile(key, hit.data, data), () => status('最新のメニュー情報を確認できませんでした。表示中のメニューで進めます（料金・空きはご予約時にお店のシステムで確認します）。', 'error'));
-        return hit.data;
+        fetchMenus(url, key, null).then(data => reconcile(key, present(hit.data), present(data)), () => status('最新のメニュー情報を確認できませんでした。表示中のメニューで進めます（料金・空きはご予約時にお店のシステムで確認します）。', 'error'));
+        return present(hit.data);
     }
     function menuEntry(list, id) { return (list || []).find(m => m.id === id) || null; }
     function sameMenu(a, b) { return !!a && !!b && a.bookable === b.bookable && a.webBookingEnabled === b.webBookingEnabled && a.name === b.name && a.price === b.price && a.durationMinutes === b.durationMinutes; }
+    const listed = d => JSON.stringify([VISIT_FIELDS.map(f => d[f]), d.menus]);
     function reconcile(key, shown, data) {
-        if (JSON.stringify(shown) === JSON.stringify(data)) { status('', ''); return; }
+        if (listed(shown) === listed(data)) { status('', ''); if (shown.provisional) freshAnswer(key, data); return; }
         status('', '');
         if (submitting || completed) return;
+        const selected = selectedMenuIds();
         // The server now answers differently about who this visitor is: start the menu step again.
         if (VISIT_FIELDS.some(f => shown[f] !== data[f])) {
             if (flowStep !== 'menu') showStep('menu', false);
             visitExperience = null; visitAsked = false;
             reapply(key, data, [], false);
-            showNotice('ご来店の情報を確認しました。お手数ですが、もう一度お選びください。');
+            if (selected.length) showNotice('ご来店の情報を確認しました。お手数ですが、もう一度お選びください。');
             return;
         }
-        const selected = selectedMenuIds(), changed = selected.filter(id => !sameMenu(menuEntry(shown.menus, id), menuEntry(data.menus, id)));
-        if (flowStep !== 'menu' && !changed.length) { menuStale = true; return; } // applied when the customer comes back to the menus
+        const changed = selected.filter(id => !sameMenu(menuEntry(shown.menus, id), menuEntry(data.menus, id)));
+        if (flowStep !== 'menu' && !changed.length) { menuStale = true; freshAnswer(key, data); return; } // applied when the customer comes back to the menus
         if (flowStep !== 'menu') showStep('menu', false);
-        reapply(key, data, selected.filter(id => !changed.includes(id)), changed.length > 0);
+        const notEligible = changed.some(id => (menuEntry(data.menus, id) || {}).unavailableReason === 'customer_not_eligible');
+        reapply(key, data, selected.filter(id => !changed.includes(id)), changed.length > 0, notEligible);
     }
+    // The page keeps the menus it drew; the server's own answer is what it uses from now on (menusStale).
+    function freshAnswer(key, data) { freshMenus = {key, json: JSON.stringify(data)}; }
     // Re-run the page's own menu loading with the fresh answer (served from memory, no new request), then
     // restore the selection that is still bookable.
-    function reapply(key, data, keep, dropped) {
+    function reapply(key, data, keep, dropped, notEligible) {
         freshMenus = {key, json: JSON.stringify(data)};
         Promise.resolve(loadMenus()).then(() => {
             for (const id of keep) { const m = menuEntry(menus, id); if (m && m.bookable && m.webBookingEnabled) selectMenu(id, true); }
-            if (dropped) showNotice('選択中のメニューの受付内容が更新されました。メニューをご確認のうえ、選び直してください。');
+            if (dropped) showNotice(notEligible ? CUSTOMER_NOT_ELIGIBLE_TEXT : '選択中のメニューの受付内容が更新されました。メニューをご確認のうえ、選び直してください。');
         });
     }
     // ---- week availability (display only) ----
+    // One menu alone, no conditions, the week of a recent menus answer for the same visit: that answer's own
+    // availabilityWeek answer (weekBundle), without a request.
+    function bundledWeek(url) {
+        const q = new URLSearchParams(url.slice(url.indexOf('?') + 1));
+        if (q.get('action') !== 'availabilityWeek' || !q.get('menuId') || ['menuIds', 'dates', 'attributes', 'consultationContentChanged'].some(k => q.has(k))) return null;
+        const hit = bundles.get(q.get('visitExperience') || '');
+        if (!hit || Date.now() - hit.at > BUNDLE_TTL_MS || hit.bundle.startDate !== q.get('startDate')) return null;
+        const m = hit.bundle.menus && hit.bundle.menus[q.get('menuId')], evaluations = hit.bundle.evaluations;
+        if (!m || !m.days || !Array.isArray(evaluations)) return null;
+        const days = {};
+        for (const [date, day] of Object.entries(m.days)) {
+            if (!evaluations[day.evaluation]) return null;
+            days[date] = {...day, evaluation: JSON.parse(JSON.stringify(evaluations[day.evaluation]))};
+        }
+        return {status: 'success', slotMinutes: 10, startIntervalMinutes: PEPEL_BOOKING_CONFIG.startIntervalMinutes, startDate: hit.bundle.startDate, menuId: q.get('menuId'), days};
+    }
     function weekRequest(url) {
+        const local = bundledWeek(url);
+        if (local) return Promise.resolve(local);
+        // The menus answer that brings this week is still on its way (a quick tap): it was asked first, so wait for it.
+        const visit = (/[?&]visitExperience=([a-z]+)/.exec(url) || [])[1] || null;
+        const single = /[?&]menuId=/.test(url) && !/[?&](menuIds|dates|attributes|consultationContentChanged)=/.test(url);
+        const coming = single && (inflight.get(menusUrl(visit)) || inflight.get(menusUrl(null)));
+        if (coming && !weekCache.has(url)) return coming.then(() => bundledWeek(url), () => null).then(hit => hit || serverWeek(url));
+        return serverWeek(url);
+    }
+    function serverWeek(url) {
         const hit = weekCache.get(url);
         if (hit && (hit.data === undefined || Date.now() - hit.at < WEEK_TTL_MS)) return hit.promise;
         const entry = {at: Date.now(), data: undefined};
@@ -912,7 +1015,7 @@ const PepelSpeed = (function() {
         weekCache.set(url, entry);
         return entry.promise;
     }
-    function clearWeeks() { weekCache.clear(); }
+    function clearWeeks() { weekCache.clear(); bundles.clear(); }
     function weekUrl(menuKey, start) { return GAS_WEB_APP_URL + '?action=availabilityWeek&startDate=' + encodeURIComponent(start) + menuQuery(menuKey); }
     function requestJSON(url, options = {}) {
         url = String(url);
@@ -981,7 +1084,7 @@ const PepelSpeed = (function() {
         });
     }
     return {requestJSON, install, prefetchForMenus, prefetchNextWeek, pushStep, clearWeeks,
-        menusStale: () => menuStale, clearMenuStale: () => { menuStale = false; }, _store: store, _weekCache: weekCache};
+        menusStale: () => menuStale, clearMenuStale: () => { menuStale = false; }, _store: store, _weekCache: weekCache, _bundledWeek: bundledWeek};
 })();
 // The page's own functions are wrapped (function declarations are hoisted, so they exist here).
 const requestJSONBase = requestJSON;
@@ -1154,7 +1257,8 @@ function renderMenuCards() {
         const meta = document.createElement('span'); meta.className = 'card-meta';
         meta.textContent = menu.price + ' / ' + (Number.isInteger(menu.durationMinutes) ? menu.durationMinutes + '分' : '所要時間設定中');
         const state = document.createElement('span'); state.className = 'card-meta';
-        state.textContent = !menu.bookable ? 'WEB予約受付準備中' : selectedMenuIds().includes(menu.id) ? '✓ 選択中（押すと解除）' : '選択する';
+        if (menu.unavailableReason === 'customer_not_eligible') button.classList.add('not-eligible');
+        state.textContent = !menu.bookable ? (menu.unavailableReason === 'customer_not_eligible' ? CUSTOMER_NOT_ELIGIBLE_TEXT : 'WEB予約受付準備中') : selectedMenuIds().includes(menu.id) ? '✓ 選択中（押すと解除）' : '選択する';
         button.appendChild(name);
         if (menuNote(menu.id)) { const note = document.createElement('span'); note.className = 'card-note'; note.textContent = menuNote(menu.id); button.appendChild(note); }
         button.appendChild(meta); button.appendChild(state);
