@@ -305,7 +305,7 @@
 </div>
 
 
-<script>(function(){var B="af969fa76a5bc2f8";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="24b714e940085d75";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -476,7 +476,16 @@ let checkedEvaluation = null;
 const VISIT_LABEL = {first:'はじめて', returning:'担当してもらったことがある'};
 let visitExperience = null, visitAsked = false;
 function visitQuery() { return visitExperience ? '&visitExperience=' + visitExperience : ''; }
+// Booking approval (RESERVATION_RULE_DESIGN §14A): the menus answer says whether the store currently takes requests
+// (wording only); whether this booking became a request is the booking answer's bookingState.
+let approvalHint = false;
+function acceptApproval(data) {
+    if (!data || data.provisional === true || typeof data.catalogVersion !== 'string') return; // only a server answer tells
+    approvalHint = data.bookingApproval === true;
+    if (submitBtn) submitBtn.textContent = approvalHint ? '予約を申請する' : '予約を確定する';
+}
 function acceptVisit(data) {
+    acceptApproval(data);
     if (data.visitExperienceKnown === true && Object.hasOwn(VISIT_LABEL, data.visitExperience)) { visitExperience = data.visitExperience; visitAsked = false; renderVisit(false); return true; }
     if (data.askVisitExperience === true && !visitExperience) { renderVisit(true); return false; }
     renderVisit(false); return true;
@@ -708,6 +717,16 @@ function hideBusy() { const o = document.getElementById('busyOverlay'); if (o) o
 function showCompleted(data, p) {
     forgetPending(); bookingRequest = null; showOutcome('');
     const link = document.getElementById('cancelLink'), hint = document.getElementById('cancelLinkHint');
+    // A pending request is never called a confirmed booking (§14A).
+    const pending = data.bookingState === 'pending';
+    document.getElementById('completedHeading').textContent = pending ? 'ご予約の申請を受け付けました。' : 'ご予約を承りました。';
+    let notice = document.getElementById('completedNotice');
+    if (!notice) { notice = document.createElement('p'); notice.id = 'completedNotice'; document.getElementById('completedHeading').insertAdjacentElement('afterend', notice); }
+    notice.textContent = pending ? '店舗が確認後、確定のご連絡をします。' : ''; notice.hidden = !pending;
+    if (pending) {
+        link.textContent = '申請の確認・取り下げ';
+        hint.textContent = '申請の状態の確認や取り下げ、確定後のキャンセルに備え、このリンクを保存してください。リンクは他の人に共有しないでください。';
+    }
     // The one cancel screen (customer-cancel/, D1) reads the credentials from the fragment, which is
     // never sent to a server, and replaces it right away.
     if (PEPEL_BOOKING_CONFIG.cancelPage && data.canCancel === true && typeof data.cancelToken === 'string' && /^[a-f0-9]{64}$/.test(data.cancelToken)) {
@@ -722,7 +741,8 @@ function showCompleted(data, p) {
     }
     completed = true; submitting = false; loadingMsg.style.display = 'none'; hideBusy();
     const details = document.getElementById('completedDetails'); details.replaceChildren();
-    [['予約ID', data.reservationId], ['予約したメニュー', p.menuName], ['予約日時', p.date + '　' + p.time],
+    [['予約ID', data.reservationId], [pending ? '申請したメニュー' : '予約したメニュー', p.menuName], [pending ? 'ご希望の日時' : '予約日時', p.date + '　' + p.time],
+      ...(pending ? [['ご予約の状態', '申請中（店舗の確認待ち）']] : []),
       ...(p.priceLines || []).map(line=>[line.startsWith('合計') ? '合計' : '内訳',line.startsWith('合計　') ? line.slice(3) : line])].forEach(([label, value]) => {
         const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
         dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); details.appendChild(row);
@@ -775,7 +795,7 @@ async function submitReservation() {
         ...(visitAsked && visitExperience ? {visitExperience} : {}),
         confirmation:{totalMinYen:e.pricing.total.minimumYen, totalMaxYen:e.pricing.total.maximumYen, certainty:e.pricing.total.certainty, finalDurationMinutes:e.duration.finalDurationMinutes}};
     const p = {requestId:payload.requestId, resumeProof:payload.resumeProof, date:payload.date, time:payload.time, menuName:selectedMenu().name,priceLines:priceLines(e)};
-    lockForSubmit('予約を確定しています…');
+    lockForSubmit(approvalHint ? '予約を申請しています…' : '予約を確定しています…');
     rememberPending(p); // before sending: a reload or another tab continues the inquiry
     let data;
     try { data = await callBooking(payload); }

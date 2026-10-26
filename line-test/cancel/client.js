@@ -15,11 +15,13 @@
     return Object.freeze({reservationId,cancelToken});
   }
   function createController({credentials,transport,onChange=()=>{}}) {
-    let state={phase:'idle'}, busy=false, uncertain=false, finished=false;
+    let state={phase:'idle'}, busy=false, uncertain=false, finished=false, notice=null;
     const emit=(phase,extra={})=>{state=Object.freeze({phase,...extra});onChange(state);return state;};
+    // bookingState (§14A): confirmed | pending (a request waiting for the store) | declined | withdrawn | cancelled.
+    const STATES=['confirmed','pending','declined','withdrawn','cancelled'];
     const view=data=>data && data.status==='success' && typeof data.date==='string' && /^\d{4}-\d{2}-\d{2}$/.test(data.date) &&
       typeof data.time==='string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(data.time) && typeof data.menu==='string' && typeof data.cancelled==='boolean'
-      ? {date:data.date,time:data.time,menu:data.menu,cancelled:data.cancelled} : null;
+      ? {date:data.date,time:data.time,menu:data.menu,cancelled:data.cancelled,bookingState:STATES.includes(data.bookingState)?data.bookingState:data.cancelled?'cancelled':'confirmed'} : null;
     const request=(action,extra={})=>transport({sourceType:'WEB_PAGE',action,...credentials,...extra});
     async function inspect() {
       if(busy || finished)return state;
@@ -27,13 +29,17 @@
       busy=true;emit(uncertain?'checking':'loading');
       try {
         const data=await request('cancelPreview'),details=view(data);
+        if(details?.bookingState==='declined'){finished=true;return emit('declined',{details});}
+        if(details?.bookingState==='withdrawn'){finished=true;return emit('withdrawn',{details,alreadyWithdrawn:true});}
         if(details?.cancelled){finished=true;return emit('done',{details,alreadyCancelled:true});}
         // An active read cannot prove that an earlier cancellation will never commit.
         if(uncertain)return emit('unknown');
         if(data?.status==='cancel_deadline_passed')return emit('deadline');
         if(data?.status==='cancel_unavailable')return emit('unavailable');
         if(!details)return emit('read_error');
-        return emit('preview',{details});
+        const shown=notice;notice=null;
+        if(details.bookingState==='pending')return emit('pending',{details});
+        return emit('preview',{details,...(shown?{notice:shown}:{})});
       } catch (_) { return emit(uncertain?'unknown':'read_error'); }
       finally {busy=false;}
     }
@@ -42,7 +48,27 @@
       // Phone/reason stay in the form until submission, never in public controller state.
       emit('confirm',{details:state.details});return true;
     }
-    function back() {if(!busy && state.phase==='confirm')emit('preview',{details:state.details});}
+    function back() {if(!busy && state.phase==='confirm')emit('preview',{details:state.details});else if(!busy && state.phase==='withdrawConfirm')emit('pending',{details:state.details});}
+    function reviewWithdraw({phone}) {
+      if(busy || uncertain || finished || state.phase!=='pending' || typeof phone!=='string' || !phone.trim())return false;
+      emit('withdrawConfirm',{details:state.details});return true;
+    }
+    async function withdraw({phone}={}) {
+      if(busy || uncertain || finished || state.phase!=='withdrawConfirm' || typeof phone!=='string' || !phone.trim())return state;
+      busy=true;const details=state.details;emit('withdrawing',{details});
+      uncertain=true; // as for a cancel: the transport may fail after the commit started
+      try {
+        const data=await request('withdrawRequest',{phone});
+        if(data?.status==='success' && typeof data.alreadyWithdrawn==='boolean'){finished=true;uncertain=false;return emit('withdrawn',{details,alreadyWithdrawn:data.alreadyWithdrawn});}
+        if(data?.status==='not_pending'){
+          // The store decided first (or it was confirmed automatically): show the request as it is now.
+          uncertain=false;busy=false;notice=data.bookingState==='confirmed'?'confirmed_meanwhile':'changed_meanwhile';return inspect();
+        }
+        if(data?.status==='cancel_unavailable'){uncertain=false;return emit('unavailable');}
+        return emit('unknown');
+      } catch (_) {return emit('unknown');}
+      finally {busy=false;}
+    }
     async function cancel({phone,reason=''}={}) {
       if(busy || uncertain || finished || state.phase!=='confirm' || typeof phone!=='string' || !phone.trim() || typeof reason!=='string')return state;
       busy=true;const details=state.details;emit('sending',{details});
@@ -59,7 +85,7 @@
       } catch (_) {return emit('unknown');}
       finally {busy=false;}
     }
-    return Object.freeze({inspect,review,back,cancel,getState:()=>state});
+    return Object.freeze({inspect,review,back,cancel,reviewWithdraw,withdraw,getState:()=>state});
   }
   // Same-origin POST-only binding. Caller can instead supply Claude's existing API adapter.
   function httpTransport({endpoint,fetchImpl=globalThis.fetch,base=globalThis.location?.href,timeoutMs=15000}) {
