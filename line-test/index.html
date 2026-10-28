@@ -305,7 +305,7 @@
 </div>
 
 
-<script>(function(){var B="24b714e940085d75";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="362b1ecf1c7f223d";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -479,6 +479,26 @@ function visitQuery() { return visitExperience ? '&visitExperience=' + visitExpe
 // Booking approval (RESERVATION_RULE_DESIGN §14A): the menus answer says whether the store currently takes requests
 // (wording only); whether this booking became a request is the booking answer's bookingState.
 let approvalHint = false;
+let contactKnown = false;
+let registeredContactHint = null;
+function acceptContact(data) {
+    if (!data || data.provisional === true) return;
+    if (!registeredContactHint) {
+        registeredContactHint = document.createElement('p');
+        registeredContactHint.className = 'hint';
+        registeredContactHint.textContent = 'ご登録のお名前・電話番号でご予約します';
+        registeredContactHint.hidden = true;
+        nameInput.before(registeredContactHint);
+    }
+    const known = PEPEL_BOOKING_CONFIG.lineContext && data.contactKnown === true;
+    if (contactKnown === known) return;
+    contactKnown = known;
+    for (const element of [nameInput.labels[0],nameInput,phoneInput.labels[0],phoneInput,document.getElementById('phoneHint')]) element.hidden = known;
+    registeredContactHint.hidden = !known;
+    nameInput.required = !known;
+    phoneInput.required = !known;
+    updateSubmit();
+}
 function acceptApproval(data) {
     if (!data || data.provisional === true || typeof data.catalogVersion !== 'string') return; // only a server answer tells
     approvalHint = data.bookingApproval === true;
@@ -486,6 +506,7 @@ function acceptApproval(data) {
 }
 function acceptVisit(data) {
     acceptApproval(data);
+    acceptContact(data);
     if (data.visitExperienceKnown === true && Object.hasOwn(VISIT_LABEL, data.visitExperience)) { visitExperience = data.visitExperience; visitAsked = false; renderVisit(false); return true; }
     if (data.askVisitExperience === true && !visitExperience) { renderVisit(true); return false; }
     renderVisit(false); return true;
@@ -789,8 +810,9 @@ async function submitReservation() {
     if (!bookingRequest || bookingRequest.key !== reviewedSelection) bookingRequest = {requestId:randomId(), resumeProof:randomId(), key:reviewedSelection};
     const ids = selectedMenuIds(), e = checkedEvaluation;
     const payload = {sourceType:'WEB_PAGE', requestVersion:3, requestId:bookingRequest.requestId, resumeProof:bookingRequest.resumeProof,
-        ...(ids.length === 1 ? {menuId:ids[0]} : {menuIds:ids}), date:dateInput.value, time:timeSelect.value, name:nameInput.value.trim(),
-        phone:normalizedPhone(phoneInput.value), ...(contactEmail() ? {email:contactEmail()} : {}), cancellationPolicyAccepted:policyInput.checked === true, customerRequests:customerRequests(), attributes:JSON.parse(JSON.stringify(conditions.attributes)),
+        ...(ids.length === 1 ? {menuId:ids[0]} : {menuIds:ids}), date:dateInput.value, time:timeSelect.value,
+        ...(contactKnown ? {} : {name:nameInput.value.trim(),phone:normalizedPhone(phoneInput.value)}),
+        ...(contactEmail() ? {email:contactEmail()} : {}), cancellationPolicyAccepted:policyInput.checked === true, customerRequests:customerRequests(), attributes:JSON.parse(JSON.stringify(conditions.attributes)),
         ...(conditions.consultationContentChanged === null ? {} : {consultationContentChanged:conditions.consultationContentChanged}),
         ...(visitAsked && visitExperience ? {visitExperience} : {}),
         confirmation:{totalMinYen:e.pricing.total.minimumYen, totalMaxYen:e.pricing.total.maximumYen, certainty:e.pricing.total.certainty, finalDurationMinutes:e.duration.finalDurationMinutes}};
@@ -894,7 +916,7 @@ const PepelSpeed = (function() {
     // menus only after the server said it does not know the visitor (the answers per visit choice are then
     // the same for everyone). A LINE page keys stored answers by its LINE user. askVisitFirst (the anonymous
     // WEB deployment, where no visitor is ever identified) skips that first question to the server.
-    const VISIT_FIELDS = ['askVisitExperience', 'visitExperienceKnown', 'visitExperience'];
+    const VISIT_FIELDS = ['askVisitExperience', 'visitExperienceKnown', 'visitExperience', 'contactKnown'];
     let anonymous = !!PEPEL_BOOKING_CONFIG.askVisitFirst;
     const inflight = new Map(), bundles = new Map(); // visit -> {at, bundle} (week of every menu, from menus answers)
     const shownWeek = () => mondayOf(dateInput.min);
@@ -1212,12 +1234,12 @@ function bookingReady() {
 }
 function customerRequests() { return requestsInput.value.replace(/\r\n?/g, '\n').trim(); }
 function customerDetailsReady() {
-    return !!nameInput.value.trim() && !!normalizedPhone(phoneInput.value) && emailReady() &&
+    return (contactKnown || !!nameInput.value.trim() && !!normalizedPhone(phoneInput.value)) && emailReady() &&
         requestsInput.value.length <= MAX_REQUESTS_LENGTH && policyInput.checked === true;
 }
 function reviewKey() {
-    return JSON.stringify([selectionKey(), timeSelect.value, nameInput.value.trim(),
-        normalizedPhone(phoneInput.value), contactEmail(), customerRequests(), policyInput.checked]);
+    return JSON.stringify([selectionKey(), timeSelect.value, contactKnown ? 'registered' : nameInput.value.trim(),
+        contactKnown ? 'registered' : normalizedPhone(phoneInput.value), contactEmail(), customerRequests(), policyInput.checked]);
 }
 function showStep(step, focus = true) {
     if (submitting || completed) return;
@@ -1320,7 +1342,7 @@ function openReview() {
     const menu = selectedMenu();
     reviewDetails.replaceChildren();
     [...(visitExperience ? [['ご来店',VISIT_LABEL[visitExperience]]] : []),['メニュー',menu.name],['料金',priceLines(checkedEvaluation).join('\n')],['所要時間',durationText(checkedEvaluation)],
-        ['ご予約日時',dateInput.value + '　' + timeSelect.value + '〜' + endTimeOf(timeSelect.value, checkedEvaluation)],['お名前',nameInput.value.trim()],['電話番号',normalizedPhone(phoneInput.value)],['メールアドレス',contactEmail() || 'なし'],
+        ['ご予約日時',dateInput.value + '　' + timeSelect.value + '〜' + endTimeOf(timeSelect.value, checkedEvaluation)],...(contactKnown ? [['お名前・電話番号','ご登録の内容を使用']] : [['お名前',nameInput.value.trim()],['電話番号',normalizedPhone(phoneInput.value)]]),['メールアドレス',contactEmail() || 'なし'],
         ...(customerRequests() ? [['ご要望など',customerRequests()]] : [])].forEach(([label,value]) => {
         const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
         dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); reviewDetails.appendChild(row);
