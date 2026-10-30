@@ -270,7 +270,7 @@
         <textarea id="customerRequests" rows="2" maxlength="100"></textarea>
         <section class="cancel-policy" aria-labelledby="cancelPolicyHeading">
             <h3 id="cancelPolicyHeading">キャンセルについて</h3>
-            <p id="cancelPolicyText">変更・キャンセルは、できるだけ早めにご連絡をお願いいたします。<br>当日のキャンセルや大幅な遅刻の場合は、LINEまたはお電話にてご連絡ください。<br><br>ご連絡なく来店されなかった場合は、施術料金の100％をキャンセル料としてお願いする場合がございます。<br>また、以降のご予約をお受けできない場合がございます。</p>
+            <p id="cancelPolicyText">変更・キャンセルは、できるだけ早めにご連絡をお願いいたします。<br>当日のキャンセルや大幅な遅刻の場合は、公式LINEでご連絡ください。<br><br>ご連絡なく来店されなかった場合は、施術料金の100％をキャンセル料としてお願いする場合がございます。<br>また、以降のご予約をお受けできない場合がございます。</p>
             <label class="policy-check" for="cancelPolicy"><input id="cancelPolicy" type="checkbox" aria-describedby="cancelPolicyText" required><span>キャンセルポリシーを確認しました</span></label>
         </section>
         <div class="actions"><button id="backDate" type="button">日時へ戻る</button><button class="btn" id="reviewBtn" type="button" disabled>予約内容を確認する</button></div>
@@ -305,7 +305,7 @@
 </div>
 
 
-<script>(function(){var B="362b1ecf1c7f223d";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="018af772b25b0b29";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -421,19 +421,26 @@ const CONDITION_FIELDS = {
     schoolStage: {label:'お子さまの学年', options:[['preschool','未就学'],['primary_1','小学1年'],['primary_2','小学2年'],['primary_3','小学3年'],['primary_4','小学4年'],['primary_5','小学5年'],['primary_6','小学6年'],['other','それ以外']]},
     lighteningMethod: {label:'明るくする方法', options:[['full_bleach','全体ブリーチ'],['highlights','ハイライト']]}
 };
+const BLEACH_LENGTH = {label:'髪の毛全体の長さは顎か首の中間より下ですか？',options:[['M','はい'],['S','いいえ']]};
+function binaryLengthFor(ids) {
+    return ids.some(id => id === 'PM0011' || id === 'PM0012') &&
+        !ids.some(id => ['PM0005','PM0007','PM0017','PM0018'].includes(id));
+}
 const PERM_PARTS = [['fringe','前髪'],['top','トップ']];
 const REASON_TEXT = {
-    full_cut_experience_within_year_required:'当店でのフルカットから2年以内の方が対象のメニューです。',
+    full_cut_experience_within_year_required:'当店でフルカットをされたことがある方が対象のメニューです。',
     henna_experience_required:'当店でヘナ染めをされたことがある方が対象のメニューです。',
-    prior_consultation_required:'事前のご相談と店舗の了承が必要なメニューです。LINEまたはお電話でご相談ください。',
+    prior_consultation_required:'事前のご相談と店舗の了承が必要なメニューです。公式LINEでご相談ください。',
+    length_not_supported:'ご選択の髪の長さでは、このメニューはWEBでご予約いただけません。公式LINEでお問い合わせください。',
+    double_color_requires_highlights_below_chin:'ご選択の髪の長さでは、このメニューはWEBでご予約いただけません。公式LINEでお問い合わせください。',
     excluded_combination:'この組み合わせは同時にご予約いただけません。メニューを選び直してください。'
 };
-const STORE_CHECK_TEXT = 'ご予約の条件を店舗で確認する必要があります。LINEまたはお電話でお問い合わせください。';
-const TOTAL_NOT_FIXED_TEXT = 'この組み合わせは料金がご来店時に確定するため、現在WEBではご予約いただけません。LINEまたはお電話でお問い合わせください。';
-const NOT_BOOKABLE_TEXT = 'ご選択の内容は、WEBではご予約いただけません。LINEまたはお電話でお問い合わせください。';
+const STORE_CHECK_TEXT = 'ご予約の条件を店舗で確認する必要があります。公式LINEでお問い合わせください。';
+const TOTAL_NOT_FIXED_TEXT = 'この組み合わせは料金がご来店時に確定するため、現在WEBではご予約いただけません。公式LINEでお問い合わせください。';
+const NOT_BOOKABLE_TEXT = 'ご選択の内容は、WEBではご予約いただけません。公式LINEでお問い合わせください。';
 // A menu this customer cannot book (server answer: not listed for this customer, or no bookable day for a reason other
 // than a closed day). The card stays in the list, dimmed (owner 2026-10-25).
-const CUSTOMER_NOT_ELIGIBLE_TEXT = 'このメニューはご予約いただけません。店舗へお問い合わせください。';
+const CUSTOMER_NOT_ELIGIBLE_TEXT = 'このメニューはご予約いただけません。公式LINEでお問い合わせください。';
 const BOOKABLE_STATES = ['ready_for_time_selection','allowed'];
 const conditions = {attributes:{}, consultationContentChanged:null};
 // Contact email (N13 8W, notification contract v2 §2.2/T2): required on the WEB page, optional inside LINE (reminders
@@ -625,7 +632,9 @@ function renderConditions() {
     for (const field of missing.map(fieldOf).filter(Boolean)) if (!shownConditionFields.includes(field)) shownConditionFields.push(field);
     const storeOnly = missing.some(code => !fieldOf(code));
     panel.hidden = !shownConditionFields.length && !storeOnly;
-    const key = JSON.stringify([shownConditionFields, storeOnly]);
+    const selectedIds = selectedMenuIds();
+    const bleachLengthOnly = binaryLengthFor(selectedIds);
+    const key = JSON.stringify([shownConditionFields, storeOnly, bleachLengthOnly]);
     if (panel.dataset.key === key) return;
     panel.dataset.key = key; panel.replaceChildren();
     const title = document.createElement('p'); title.className = 'conditions-title';
@@ -633,7 +642,7 @@ function renderConditions() {
     panel.appendChild(title);
     for (const field of shownConditionFields) {
         if (CONDITION_FIELDS[field]) {
-            const def = CONDITION_FIELDS[field], label = document.createElement('label'), select = document.createElement('select');
+            const def = field === 'hairLength' && bleachLengthOnly ? BLEACH_LENGTH : CONDITION_FIELDS[field], label = document.createElement('label'), select = document.createElement('select');
             label.textContent = def.label; select.id = 'condition-' + field;
             select.appendChild(new Option('選択してください', ''));
             def.options.forEach(([value, text]) => select.appendChild(new Option(text, value)));
@@ -757,7 +766,7 @@ function showCompleted(data, p) {
         link.hidden = false; hint.hidden = false;
     } else if (data.cancelTokenAvailable === false || data.canCancel === false || data.canCancel === true) {
         // T05: the original cancel link cannot be issued again.
-        hint.textContent = data.cancelTokenAvailable === false ? 'この画面ではキャンセル用リンクを再表示できません。キャンセルが必要な場合は、店舗へLINEまたはお電話でご連絡ください。' : 'キャンセルが必要な場合は、店舗へLINEまたはお電話でご連絡ください。';
+        hint.textContent = data.cancelTokenAvailable === false ? 'この画面ではキャンセル用リンクを再表示できません。キャンセルが必要な場合は、公式LINEでご連絡ください。' : 'キャンセルが必要な場合は、公式LINEでご連絡ください。';
         hint.hidden = false;
     }
     completed = true; submitting = false; loadingMsg.style.display = 'none'; hideBusy();
@@ -793,7 +802,7 @@ async function concludeBooking(data, p) {
         return returnToForm('保存されていません（この送信は無効化済みで、後から保存されることはありません）。内容を確認して、もう一度お試しください。', false);
     }
     if (data && ['unauthorized','request_content_conflict'].includes(data.status)) {
-        showOutcome('送信結果を確認できませんでした：' + pendingLabel(p) + '。登録済みの可能性があります。同じ内容で予約し直す前に、店舗へLINEまたはお電話でご確認ください。');
+        showOutcome('送信結果を確認できませんでした：' + pendingLabel(p) + '。登録済みの可能性があります。同じ内容で予約し直す前に、公式LINEでご確認ください。');
         return returnToForm('', false);
     }
     showOutcome('');
@@ -1316,6 +1325,10 @@ function selectMenu(id, toggle = false) {
     if (completed || submitting || menuSelect.disabled || !menu) return;
     const current = selectedMenuIds();
     const ids = toggle ? (current.includes(id) ? current.filter(value => value !== id) : [...current,id]) : [id];
+    if (binaryLengthFor(current) !== binaryLengthFor(ids)) {
+        delete conditions.attributes.hairLength;
+        shownConditionFields = shownConditionFields.filter(field => field !== 'hairLength');
+    }
     const key = ids.length > 1 ? JSON.stringify(ids) : ids[0] || '';
     // 実DOMのselectは存在しない値を保持できないため、複数選択用の選択肢を1つだけ用意する。
     if (combinationOption) { combinationOption.remove(); combinationOption = null; }
@@ -1807,7 +1820,7 @@ function handOffCancellation() {
     completed = true; cancelCredentials = {};
     document.getElementById('bookingForm').hidden = true;
     document.getElementById('cancelPanel').hidden = false;
-    document.getElementById('cancelNotice').textContent = 'キャンセルは店舗へLINEまたはお電話でご連絡ください。';
+    document.getElementById('cancelNotice').textContent = 'キャンセルは公式LINEでご連絡ください。';
     return true;
 }
 window.addEventListener('hashchange', handOffCancellation);
