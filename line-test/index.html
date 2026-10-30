@@ -177,6 +177,7 @@
         #weekWarningToMenu { min-height:40px; margin:0 0 12px 32px; padding:6px 12px; border:1px solid #6b4a00; border-radius:6px; color:#4a3500; background:#fff; font-size:15px; font-weight:600; }
         #weekWarningToMenu[hidden] { display:none; }
         .schedule td.waiting { background:#f2efe8; }
+        .schedule td.closed-day { padding:8px 2px; vertical-align:top; text-align:start; color:#d0d0d0; font-size:15px; font-weight:600; line-height:1.25; writing-mode:vertical-rl; }
         .visit-question .visit-options { display:grid; gap:10px; margin:0 0 14px; }
         .visit-note { margin:-4px 0 4px; font-size:13px; color:#5c574c; }
         .menu-card .card-note { font-size:13px; color:#4f4b42; margin-top:4px; }
@@ -314,7 +315,7 @@
 </div>
 
 
-<script>(function(){var B="5a15a35a0063c36d";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="f0165b10ca99ae3b";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -1476,7 +1477,7 @@ function validAvailability(data, date, menuId) {
     return data.date === date && responseMenuKey(data) === menuId && data.slotMinutes === 10 &&
         typeof data.isClosed === 'boolean' && Array.isArray(data.availableStartTimes) &&
         data.startIntervalMinutes === PEPEL_BOOKING_CONFIG.startIntervalMinutes &&
-        data.availableStartTimes.every(time => /^(?:[01]\d|2[0-3]):[0-5]0$/.test(time)) && validEvaluation(data.evaluation);
+        data.availableStartTimes.every(time => /^(?:[01]\d|2[0-3]):[0-5]0$/.test(time)) && validEvaluation(data.evaluation) && (data.closedKind === undefined || data.closedKind === 'regular' || data.closedKind === 'other');
 }
 function renderWeek() {
     const table = document.getElementById('schedule'); table.replaceChildren();
@@ -1513,12 +1514,23 @@ function renderWeek() {
     const body = document.createElement('tbody');
     const labels = [...times].filter(isGridStart).sort();
     if (!labels.length) labels.push('—');
-    labels.forEach(time => {
+    labels.forEach((time,rowIndex) => {
         const row = document.createElement('tr'), label = document.createElement('th');
         label.textContent = time; label.setAttribute('scope','row'); row.appendChild(label);
         weekDays.forEach(day => {
             const cell = document.createElement('td');
             const past = day.date < dateInput.min;
+            const closed = !past && day.data && day.data.isClosed && ['regular','other'].includes(day.data.closedKind);
+            if (closed) {
+                if (rowIndex === 0) {
+                    cell.className = 'unavailable closed-day'; cell.rowSpan = labels.length;
+                    const label = day.data.closedKind === 'regular' ? '定休日' : '休業日';
+                    cell.textContent = label;
+                    cell.setAttribute('aria-label',day.date + ' ' + label + 'のため予約不可');
+                    row.appendChild(cell);
+                }
+                return;
+            }
             const slotTimes = !past && day.data && !day.data.isClosed ? day.data.availableStartTimes.filter(t => gridRowOf(t) === time).sort() : [];
             const canBook = slotTimes.length > 0;
             if (canBook) {
@@ -1833,7 +1845,12 @@ async function loadAvailability() {
             displayedDay.error = false;
             renderWeek();
         }
-        if (data.isClosed) { resetTimes('休業日です'); showNotice('この日は休業日です。'); return 'unavailable'; }
+        if (data.isClosed) {
+            const regular = data.closedKind === 'regular';
+            resetTimes(regular ? '定休日です' : '休業日です');
+            showNotice(regular ? 'この日は定休日です。' : 'この日は休業日です。');
+            return 'unavailable';
+        }
         if (!evaluationReady(data.evaluation)) { resetTimes('この条件ではご予約いただけません'); showNotice(evaluationMessage(data.evaluation)); renderConditions(); return 'unavailable'; }
         if (data.bookingAvailable === false) { resetTimes('この組み合わせはWEBでご予約いただけません'); showNotice(TOTAL_NOT_FIXED_TEXT); return 'unavailable'; }
         const startTimes = customerAvailability(data).availableStartTimes;
