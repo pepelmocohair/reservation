@@ -305,7 +305,7 @@
 </div>
 
 
-<script>(function(){var B="a9e26199f5afea47";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="0c46a7efde1f700c";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -421,7 +421,7 @@ const CONDITION_FIELDS = {
     schoolStage: {label:'お子さまの学年', options:[['preschool','未就学'],['primary_1','小学1年'],['primary_2','小学2年'],['primary_3','小学3年'],['primary_4','小学4年'],['primary_5','小学5年'],['primary_6','小学6年'],['other','それ以外']]},
     lighteningMethod: {label:'明るくする方法', options:[['full_bleach','全体ブリーチ'],['highlights','ハイライト']]}
 };
-const BLEACH_LENGTH = {label:'髪の毛全体の長さは顎か首の中間より下ですか？',options:[['M','はい'],['S','いいえ']]};
+const BLEACH_LENGTH = {label:'ヘアスタイルはショート、もしくはボブで、首の中間より上の長さですか？',options:[['S','はい'],['M','いいえ']]};
 function binaryLengthFor(ids) {
     return ids.some(id => id === 'PM0011' || id === 'PM0012') &&
         !ids.some(id => ['PM0005','PM0007','PM0017','PM0018'].includes(id));
