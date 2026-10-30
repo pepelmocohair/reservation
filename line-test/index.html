@@ -305,7 +305,7 @@
 </div>
 
 
-<script>(function(){var B="0c46a7efde1f700c";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="db240c2041d169f1";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -422,6 +422,9 @@ const CONDITION_FIELDS = {
     lighteningMethod: {label:'明るくする方法', options:[['full_bleach','全体ブリーチ'],['highlights','ハイライト']]}
 };
 const BLEACH_LENGTH = {label:'ヘアスタイルはショート、もしくはボブで、首の中間より上の長さですか？',options:[['S','はい'],['M','いいえ']]};
+// PM0003 only distinguishes eligible from unsupported ages. Keep the evaluator's enum; primary_6
+// is the representative affirmative value and is never presented as the customer's actual grade.
+const CHILD_CUT_AGE = {label:'小学生以下ですか？',options:[['primary_6','はい'],['other','いいえ']]};
 function binaryLengthFor(ids) {
     return ids.some(id => id === 'PM0011' || id === 'PM0012') &&
         !ids.some(id => ['PM0005','PM0007','PM0017','PM0018'].includes(id));
@@ -433,6 +436,7 @@ const REASON_TEXT = {
     prior_consultation_required:'事前のご相談と店舗の了承が必要なメニューです。公式LINEでご相談ください。',
     length_not_supported:'ご選択の髪の長さでは、このメニューはWEBでご予約いただけません。公式LINEでお問い合わせください。',
     double_color_requires_highlights_below_chin:'ご選択の髪の長さでは、このメニューはWEBでご予約いただけません。公式LINEでお問い合わせください。',
+    child_cut_age_not_supported:'小学生までのお子さまが対象のメニューです。公式LINEでお問い合わせください。',
     excluded_combination:'この組み合わせは同時にご予約いただけません。メニューを選び直してください。'
 };
 const STORE_CHECK_TEXT = 'ご予約の条件を店舗で確認する必要があります。公式LINEでお問い合わせください。';
@@ -642,7 +646,7 @@ function renderConditions() {
     panel.appendChild(title);
     for (const field of shownConditionFields) {
         if (CONDITION_FIELDS[field]) {
-            const def = field === 'hairLength' && bleachLengthOnly ? BLEACH_LENGTH : CONDITION_FIELDS[field], label = document.createElement('label'), select = document.createElement('select');
+            const def = field === 'hairLength' && bleachLengthOnly ? BLEACH_LENGTH : field === 'schoolStage' && selectedIds.includes('PM0003') ? CHILD_CUT_AGE : CONDITION_FIELDS[field], label = document.createElement('label'), select = document.createElement('select');
             label.textContent = def.label; select.id = 'condition-' + field;
             select.appendChild(new Option('選択してください', ''));
             def.options.forEach(([value, text]) => select.appendChild(new Option(text, value)));
