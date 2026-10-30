@@ -167,6 +167,11 @@
         .conditions fieldset { border:0; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px 16px; }
         .conditions legend { padding:0; margin-bottom:4px; }
         .conditions fieldset label { display:flex; align-items:center; gap:6px; min-height:44px; }
+        .week-status-box { min-width:0; }
+        .week-status-box #weekStatus.booking-warning, .menu-evaluation:not([hidden]).booking-warning { display:block; margin:10px 0; padding:12px 14px; border:2px solid #6b4a00; border-radius:8px; background:#fff4d6; color:#4a3500; font-size:16px; line-height:1.5; font-weight:700; overflow-wrap:anywhere; }
+        .week-status-box #weekStatus.booking-warning::before, .menu-evaluation:not([hidden]).booking-warning::before { content:'⚠'; margin-right:8px; }
+        #weekWarningToMenu { min-height:40px; margin:0 0 12px 32px; padding:6px 12px; border:1px solid #6b4a00; border-radius:6px; color:#4a3500; background:#fff; font-size:15px; font-weight:600; }
+        #weekWarningToMenu[hidden] { display:none; }
         .schedule td.waiting { background:#f2efe8; }
         .visit-question .visit-options { display:grid; gap:10px; margin:0 0 14px; }
         .visit-note { margin:-4px 0 4px; font-size:13px; color:#5c574c; }
@@ -186,7 +191,7 @@
         .menu-status[data-kind="error"] { color:#6b4a00; }
         .menu-evaluation:not([hidden]) { display:block; margin:10px 0 0; padding:10px 12px; border:1px solid #d9d4c7; border-radius:8px; background:#fff; font-size:14px; }
         .menu-evaluation[data-state="loading"] { color:#6b6457; }
-        .menu-evaluation[data-state="blocked"], .menu-evaluation[data-state="error"] { border-color:#d9a400; background:#fff8e6; }
+        .menu-evaluation[data-state="error"] { border-color:#d9a400; background:#fff8e6; }
     </style>
 </head>
 
@@ -249,7 +254,7 @@
         <div id="timeButtons" class="time-buttons" role="group" aria-label="予約可能時間" hidden></div>
         <div id="conditionsPanel" class="conditions" hidden></div>
         <div class="week-nav"><button id="prevWeek" type="button" aria-label="前の週">‹</button><span id="weekLabel"></span><button id="nextWeek" type="button" aria-label="次の週">›</button></div>
-        <p id="weekStatus" class="hint" role="status"></p>
+        <div id="weekStatusBox" class="week-status-box"><p id="weekStatus" class="hint" role="status" aria-live="polite"></p><button id="weekWarningToMenu" type="button" hidden>メニューを選び直す</button></div>
         <button id="retryWeek" type="button" hidden>空き状況を再取得</button>
         <div id="calendarRegion" class="schedule-scroll" tabindex="0" role="region" aria-label="7日間の予約可能時間"><table id="schedule" class="schedule" aria-label="予約可能時間一覧"></table><div id="calendarLoading" class="calendar-loading" role="status" hidden><span class="spinner" aria-hidden="true"></span><span>空き状況を<br>読み込んでいます…</span></div></div>
     </div>
@@ -305,7 +310,7 @@
 </div>
 
 
-<script>(function(){var B="db240c2041d169f1";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="66fd4d665a769e46";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -621,6 +626,26 @@ function weekConditionMessage() {
     const list = evaluationsShown().filter(e => !BOOKABLE_STATES.includes(e.state) && !(e.state === 'unavailable' && e.reasons.every(code => code === 'closed')));
     return list.length ? evaluationMessage(list[0]) : '';
 }
+function installWeekWarning() {
+    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
+    const status = document.getElementById('weekStatus'), box = document.getElementById('weekStatusBox');
+    const button = document.getElementById('weekWarningToMenu');
+    if (!status || !box || !button) return;
+    let wasWarning = false;
+    const update = () => {
+        const warning = !!weekConditionMessage() && !!status.textContent.trim();
+        status.classList.toggle('booking-warning', warning);
+        status.setAttribute('role', warning ? 'alert' : 'status');
+        status.setAttribute('aria-live', warning ? 'assertive' : 'polite');
+        box.classList.toggle('has-warning', warning);
+        button.hidden = !warning;
+        if (warning && !wasWarning) box.scrollIntoView({block:'nearest'});
+        wasWarning = warning;
+    };
+    new MutationObserver(update).observe(status, {childList:true, characterData:true, subtree:true});
+    button.addEventListener('click', () => document.getElementById('editMenu').click());
+}
+installWeekWarning();
 function changeCondition(update) {
     if (submitting || completed) return;
     update();
@@ -1094,6 +1119,10 @@ const PepelSpeed = (function() {
         summaryEl.hidden = !shown; summaryEl.dataset.state = state; if (!shown) text = '';
         summaryEl.setAttribute('aria-busy', String(state === 'loading'));
         summaryEl.textContent = text || '';
+        const blocked = state === 'blocked' && !!text;
+        summaryEl.classList.toggle('booking-warning', blocked);
+        summaryEl.setAttribute('role', blocked ? 'alert' : 'status');
+        summaryEl.setAttribute('aria-live', blocked ? 'assertive' : 'polite');
     }
     function summarize(data) {
         const days = Object.entries(data && data.days || {}).filter(([date, day]) => date >= dateInput.min && day && day.status === 'success' && !day.isClosed && day.evaluation && validEvaluation(day.evaluation)).map(([, day]) => day.evaluation);
