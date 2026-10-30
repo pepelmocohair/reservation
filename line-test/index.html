@@ -61,6 +61,10 @@
         .menu-dock { position:fixed; z-index:30; left:0; right:0; bottom:0; padding:12px max(16px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)); background:#f7f6f2; border-top:1px solid #dedbd4; }
         .menu-dock-inner { max-width:620px; margin:auto; }
         .menu-dock .hint { margin:0 0 8px; overflow-wrap:anywhere; }
+        .menu-dock #menuDetails { color:#222; }
+        .menu-selection-heading { display:block; font-size:13px; line-height:1.35; font-weight:700; margin-bottom:5px; }
+        .menu-selection-chips { display:flex; flex-wrap:wrap; gap:5px; max-height:74px; overflow:hidden; }
+        .menu-selection-chip { display:inline-block; max-width:100%; padding:2px 8px; border:1px solid #9b9b91; border-radius:999px; background:#fff; color:#222; font-size:15px; line-height:1.45; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         #menuPanel { margin-bottom:200px; }
         .schedule-scroll { overflow:auto; max-height:60vh; border:1px solid #ccc; margin:16px 0; }
         .schedule { border-collapse:separate; border-spacing:0; width:100%; min-width:460px; table-layout:fixed; font-size:12px; }
@@ -310,7 +314,7 @@
 </div>
 
 
-<script>(function(){var B="0573d712c69a1725";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="5a15a35a0063c36d";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -603,7 +607,7 @@ function uniformWeekText() {
     return texts.length === 1 ? texts[0] : null;
 }
 function evaluationSummary() {
-    return evaluationReady() ? totalText(checkedEvaluation) + ' / ' + durationText(checkedEvaluation) : uniformWeekText() || '料金・所要時間は日時を選ぶと表示されます';
+    return evaluationReady() ? totalText(checkedEvaluation) + ' / ' + durationText(checkedEvaluation) : uniformWeekText() || '';
 }
 function fieldOf(code) {
     const m = /^attributes\.(hairLength|hennaRange|schoolStage|lighteningMethod)$/.exec(code);
@@ -887,7 +891,7 @@ async function resumePending() {
 //   - Week availability (display only): the current week is prefetched shortly after the menu selection
 //     settles, the next week after a week is shown. Answers are kept in memory for 60 s, identical requests
 //     share one call. The slot check (availability of the chosen day) and the booking are never cached.
-//   - Menu step: no totals (web-booking/README.md: 料金・所要時間は日時を選ぶと表示されます). The prefetched
+//   - Menu step: no totals. The prefetched
 //     week only lets the menu step say at once when the engine refuses the selection (combination, store
 //     check) or needs conditions; prices and durations appear on the date step as before.
 //   - Back: each step is a history entry, so the browser / Android back button returns to the previous step
@@ -1258,6 +1262,34 @@ function selectedMenu() {
         price: items.map(item => item.price).join(' ＋ '),
         durationMinutes: items.reduce((sum,item) => sum + item.durationMinutes,0) };
 }
+function selectedMenuItems() {
+    return selectedMenuIds().map(id => menus.find(item => item.id === id && item.webBookingEnabled && item.bookable)).filter(Boolean);
+}
+function renderMenuDock() {
+    const items = selectedMenuItems();
+    menuDetails.replaceChildren();
+    if (!items.length) { menuDetails.textContent = menus.length ? 'メニューを選択してください' : 'メニューを読み込み中...'; return; }
+    const heading = document.createElement('span');
+    heading.className = 'menu-selection-heading';
+    heading.textContent = '選択中のメニュー（' + items.length + '件）';
+    const chips = document.createElement('span');
+    chips.className = 'menu-selection-chips';
+    const visible = items.slice(0, 3);
+    visible.forEach(item => {
+        const chip = document.createElement('span');
+        chip.className = 'menu-selection-chip';
+        chip.textContent = item.name;
+        chip.title = item.name;
+        chips.appendChild(chip);
+    });
+    if (items.length > visible.length) {
+        const more = document.createElement('span');
+        more.className = 'menu-selection-chip';
+        more.textContent = 'ほか' + (items.length - visible.length) + '件';
+        chips.appendChild(more);
+    }
+    menuDetails.append(heading, chips);
+}
 function menuQuery(key) {
     return (key.startsWith('[') ? '&menuIds=' + encodeURIComponent(key) : '&menuId=' + encodeURIComponent(key)) + conditionQuery();
 }
@@ -1313,6 +1345,7 @@ function renderFlow() {
     }
     document.getElementById('bookingForm').setAttribute('data-step', flowStep);
     const menu = selectedMenu();
+    if (flowStep === 'menu') renderMenuDock();
     flowSteps.forEach(step => document.getElementById('step-' + step).setAttribute('aria-current', flowStep === step ? 'step' : 'false'));
     flowSteps.forEach(step => { document.getElementById(step + 'Panel').hidden = flowStep !== step; });
     document.getElementById('flowProgress').textContent = (flowSteps.indexOf(flowStep) + 1) + ' / 4　' +
@@ -1619,7 +1652,8 @@ document.getElementById('retryWeek').addEventListener('click',()=>loadWeek(true)
 function renderCalendar() {
     const menu = selectedMenu();
     calendar.disabled = submitting || !menu || menuSelect.disabled;
-    menuDetails.textContent = menu ? [menu.category, menu.name, '料金・所要時間は日時を選ぶと表示されます'].join(' / ') : 'メニューを選択してください。';
+    renderMenuDock();
+    if (flowStep !== 'menu') menuDetails.textContent = menu ? menu.name + (evaluationSummary() ? '　' + evaluationSummary() : '') : 'メニューを選択してください';
     selectedDate.textContent = dateInput.value ? '選択日：' + dateInput.value :
         menu ? '日付を選択してください。' : 'メニューを選択してから日付を選んでください。';
     const [year, month] = calendarMonth.split('-').map(Number);
