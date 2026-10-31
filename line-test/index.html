@@ -310,12 +310,13 @@
             <input id="cancelPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" required>
             <p class="hint">対象の予約内容をご確認ください。「キャンセルする」を押すと予約が取り消されます。</p>
             <button id="cancelSubmit" class="btn" type="button" disabled>キャンセルする</button>
+            <div id="cancelConfirm" hidden><p>この予約をキャンセルします。よろしいですか。</p><button id="cancelConfirmYes" class="btn" type="button">はい、キャンセルする</button> <button id="cancelConfirmNo" class="btn secondary" type="button">戻る</button></div>
         </div>
     </section>
 </div>
 
 
-<script>(function(){var B="f0165b10ca99ae3b";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="27835c1d20cf3a5d";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -368,6 +369,9 @@ const PepelBookingApi = (function(config) {
         }
         if (!Object.hasOwn(POST, body.action)) throw violation('post_action');
         only(Object.keys(body), POST[body.action], 'post_keys');
+        // Without a cancel token this is the LINE self-cancel (the link in the confirmation message): no phone; the
+        // customer's LINE ID token is attached below, and the server matches it against the reservation's owner.
+        if (body.action.startsWith('cancel') && body.cancelToken === undefined && (body.phone !== undefined || typeof body.reservationId !== 'string' || !body.reservationId)) throw violation('cancel_credentials');
         if (POST[body.action] === RECEIPT && (!ID.test(body.requestId || '') || !ID.test(body.resumeProof || ''))) throw violation('request_identity');
         return {method, action:body.action, body};
     }
@@ -401,6 +405,10 @@ const PepelBookingApi = (function(config) {
                     request = {method:'POST', action:request.action, body};
                     options = {method:'POST', body:JSON.stringify(body), ...(options.signal ? {signal:options.signal} : {})};
                     url = config.apiBase;
+                } else if (request.action.startsWith('cancel') && request.body.cancelToken === undefined) {
+                    if (typeof token !== 'string' || !token) throw violation('line_auth_required');
+                    request = {...request, body:{...request.body, lineIdToken:token}};
+                    options = {...options, body:JSON.stringify(request.body)};
                 } else if (token && request.action === 'create') {
                     request = {...request, body:{...request.body, lineIdToken:token}};
                     options = {...options, body:JSON.stringify(request.body)};
@@ -1898,6 +1906,7 @@ requestsInput.addEventListener('input', updateSubmit);
 policyInput.addEventListener('change', updateSubmit);
 submitBtn.addEventListener('click', submitReservation);
 // Self-cancel: the one cancel screen (customer-cancel/). The fragment is handed over unchanged.
+let lineCancelStarted = false;
 let cancelCredentials = null; // set while this page shows the cancel notice (renderFlow hides the completion)
 function handOffCancellation() {
     if (!new URLSearchParams(location.hash.slice(1)).has('cancel')) return false;
@@ -1910,7 +1919,58 @@ function handOffCancellation() {
     return true;
 }
 window.addEventListener('hashchange', handOffCancellation);
-if (handOffCancellation()) {}
+// LINE self-cancel (the link in the confirmation message, LIFF URL + ?cancel=<reservation ID>): the customer's own LINE
+// sign-in is the credential (the adapter adds the ID token); no token and no phone number.
+function lineCancelTarget() {
+    const query = new URLSearchParams(location.search);
+    let id = query.get('cancel');
+    if (!id && query.get('liff.state')) { try { id = new URLSearchParams(query.get('liff.state').replace(/^\/?\?/, '')).get('cancel'); } catch (_) {} }
+    return id && id.length <= 100 && !/[\s\/]/.test(id) ? id : null;
+}
+async function openLineCancellation(id) {
+    completed = true; requestId++; invalidateWeek();
+    if (availabilityController) availabilityController.abort();
+    const $ = name => document.getElementById(name);
+    $('bookingForm').hidden = true; $('completedPanel').hidden = true; $('cancelPanel').hidden = false;
+    $('cancelPhone').hidden = true; $('cancelPhone').required = false;
+    document.querySelector('label[for="cancelPhone"]').hidden = true;
+    $('cancelDetails').replaceChildren(); $('cancelControls').hidden = true; $('cancelConfirm').hidden = true; $('cancelSubmit').hidden = false;
+    const notice = $('cancelNotice'), submit = $('cancelSubmit');
+    const call = (action, extra = {}) => requestJSON(GAS_WEB_APP_URL, {method:'POST', body:JSON.stringify({sourceType:'WEB_PAGE', action, reservationId:id, ...extra})});
+    const fail = error => error && error.status === 'cancel_deadline_passed' ? '当日のキャンセルは公式LINEでご連絡ください。' :
+        error && error.status ? '予約を確認できません。公式LINEでお問い合わせください。' : '通信できませんでした。時間を置いて、もう一度開いてください。';
+    let busy = false;
+    notice.textContent = '予約内容を確認中...';
+    try {
+        const data = await call('cancelPreview');
+        for (const [label, value] of [['予約日時', data.date + '　' + data.time], ['メニュー', data.menu]]) {
+            const row = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+            dt.textContent = label; dd.textContent = value; row.appendChild(dt); row.appendChild(dd); $('cancelDetails').appendChild(row);
+        }
+        if (data.cancelled) notice.textContent = 'この予約はキャンセル済みです。';
+        else if (data.canCancel !== true) notice.textContent = 'この予約はこの画面からキャンセルできません。公式LINEでご連絡ください。';
+        else { notice.textContent = ''; $('cancelControls').hidden = false; }
+    } catch (error) { notice.textContent = fail(error); }
+    $('cancelHeading').focus();
+    submit.disabled = false;
+    submit.onclick = () => { submit.hidden = true; $('cancelConfirm').hidden = false; $('cancelConfirmNo').focus(); };
+    $('cancelConfirmNo').onclick = () => { $('cancelConfirm').hidden = true; submit.hidden = false; submit.focus(); };
+    $('cancelConfirmYes').onclick = async () => {
+        if (busy) return;
+        busy = true; $('cancelConfirmYes').disabled = true; $('cancelConfirmNo').disabled = true; notice.textContent = 'キャンセル処理中...';
+        try {
+            await call('cancelReservation');
+            $('cancelControls').hidden = true; notice.textContent = '予約をキャンセルしました。この画面は閉じていただいて大丈夫です。';
+        } catch (error) {
+            notice.textContent = error && error.status ? fail(error) : 'キャンセル結果を確認できませんでした。もう一度開いて、予約の状態を確認してください。';
+            if (!(error && error.status)) { $('cancelControls').hidden = true; }
+            else { busy = false; $('cancelConfirmYes').disabled = false; $('cancelConfirmNo').disabled = false; }
+        }
+    };
+}
+{ const lineCancelId = lineCancelTarget(); if (lineCancelId) { lineCancelStarted = true; openLineCancellation(lineCancelId); } }
+
+if (handOffCancellation() || lineCancelStarted) {}
 else { resetTimes('日付とメニューを選択してください'); renderCalendar(); PepelSpeed.install(); loadMenus().then(resumePending); }
 
 </script>
