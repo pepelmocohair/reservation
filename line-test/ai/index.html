@@ -3,7 +3,7 @@ function bubble(text,who){const p=document.createElement('p');p.className='msg '
 function button(label,fn,primary=false){const b=document.createElement('button');b.type='button';b.textContent=label;if(primary)b.className='primary';b.addEventListener('click',fn);return b;}
 function showThinking(){const p=document.createElement('p');p.id='thinking';p.className='msg thinking';p.setAttribute('role','status');p.append('考えています');for(let i=0;i<3;i++){const d=document.createElement('i');d.textContent='.';p.append(d);}log.append(p);log.scrollTop=log.scrollHeight;return p;}
 function hideThinking(el){if(el&&el.parentNode)el.remove();}
-function dateLabel(date){const d=new Date(date+'T00:00:00Z'),week='日月火水木金土'[d.getUTCDay()];return date+'（'+week+'）';}
+function dateLabel(date){const d=new Date(date+'T00:00:00Z'),week='日月火水木金土'[d.getUTCDay()];return (d.getUTCMonth()+1)+'月'+d.getUTCDate()+'日（'+week+'）';}
 function renderResponse(data){const messages=Array.isArray(data.messages)?data.messages:data.status==='identity_required'?['LINEログインを確認できません。再読み込みしてください。']:['通常予約をご利用ください。'];for(const m of messages)bubble(m,'msg');
  if(data.choices?.length){const box=document.createElement('section');box.className='choices';box.setAttribute('aria-label','空き時間候補');for(const c of data.choices){const label=dateLabel(c.date)+' '+c.time+'〜　'+c.menuName;box.append(button(label,()=>sendText(c.text||c.time)));}log.append(box);}
  if(data.previousMenuAction){const box=document.createElement('section');box.className='actions';box.append(button(data.previousMenuAction.label,()=>sendText(data.previousMenuAction.text)));log.append(box);}
