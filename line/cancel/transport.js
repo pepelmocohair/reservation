@@ -1,0 +1,1 @@
+globalThis.PepelCancelTransport=function(body){return fetch("https://script.google.com/macros/s/AKfycbyBG2sM5Xr1ab87u1pUy9dFhjDKwaV-BoggFmldbOKxE7RueHmLPAJEFkwtFOxcIOjS/exec",{method:'POST',body:JSON.stringify(body),credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'}).then(function(r){if(!r.ok)throw Error('cancel transport unavailable');return r.json();});};
