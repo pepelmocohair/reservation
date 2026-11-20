@@ -21,6 +21,8 @@ textarea { resize:vertical; }
 .btn:disabled { opacity:.5; cursor:not-allowed; }
 .actions { display:grid; gap:8px; }
 :focus-visible { outline:3px solid #956c22; outline-offset:3px; }
+/* Audit C-18: the phase heading takes focus for screen readers only; no ring around it. */
+[tabindex="-1"]:focus, [tabindex="-1"]:focus-visible { outline:none; }
 [hidden] { display:none !important; }
 @media(max-width:390px) {
   body { padding:20px 12px; }

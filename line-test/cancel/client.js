@@ -59,12 +59,12 @@
       uncertain=true; // as for a cancel: the transport may fail after the commit started
       try {
         const data=await request('withdrawRequest',{phone});
-        if(data?.status==='success' && typeof data.alreadyWithdrawn==='boolean'){finished=true;uncertain=false;return emit('withdrawn',{details,alreadyWithdrawn:data.alreadyWithdrawn});}
+        if(data?.status==='success' && typeof data.alreadyWithdrawn==='boolean'){finished=true;uncertain=false;return emit('withdrawn',{details:{...details,cancelled:true,bookingState:'withdrawn'},alreadyWithdrawn:data.alreadyWithdrawn});}
         if(data?.status==='not_pending'){
           // The store decided first (or it was confirmed automatically): show the request as it is now.
           uncertain=false;busy=false;notice=data.bookingState==='confirmed'?'confirmed_meanwhile':'changed_meanwhile';return inspect();
         }
-        if(data?.status==='cancel_unavailable'){uncertain=false;return emit('unavailable');}
+        if(data?.status==='cancel_unavailable'){uncertain=false;return emit('pending',{details,notice:'phone_mismatch'});}
         return emit('unknown');
       } catch (_) {return emit('unknown');}
       finally {busy=false;}
@@ -77,10 +77,13 @@
       try {
         const data=await request('cancelReservation',{phone,...(reason.trim()?{reason}: {})});
         if(data?.status==='success' && typeof data.alreadyCancelled==='boolean') {
-          finished=true;uncertain=false;return emit('done',{details,alreadyCancelled:data.alreadyCancelled});
+          // The table shows the booking as it is now (customer walkthrough S-3): cancelled, not the state before.
+          finished=true;uncertain=false;return emit('done',{details:{...details,cancelled:true,bookingState:'cancelled'},alreadyCancelled:data.alreadyCancelled});
         }
         if(data?.status==='cancel_deadline_passed'){uncertain=false;return emit('deadline');}
-        if(data?.status==='cancel_unavailable'){uncertain=false;return emit('unavailable');}
+        // The same link read this booking a moment ago, so a refusal here is almost always the phone number
+        // (customer walkthrough S-2): nothing was written; let the customer correct it on the same screen.
+        if(data?.status==='cancel_unavailable'){uncertain=false;return emit('preview',{details,notice:'phone_mismatch'});}
         return emit('unknown');
       } catch (_) {return emit('unknown');}
       finally {busy=false;}
