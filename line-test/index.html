@@ -187,6 +187,9 @@
         .schedule td.closed-day { padding:8px 2px; vertical-align:top; text-align:start; color:#d0d0d0; font-size:15px; font-weight:600; line-height:1.25; writing-mode:vertical-rl; }
         .visit-question .visit-options { display:grid; gap:10px; margin:0 0 14px; }
         .visit-note { margin:-4px 0 4px; font-size:13px; color:#5c574c; }
+        .visit-card[aria-pressed="true"]:disabled { background:#234f43; border-color:#234f43; color:#fff; box-shadow:0 0 0 3px #b9d3c9; }
+        .visit-loading:not([hidden]) { display:flex; align-items:center; gap:10px; margin:0 0 14px; padding:12px 14px; border:1px solid #d9d4c7; border-radius:8px; background:#fff; font-weight:600; color:#234f43; }
+        .visit-loading .spinner { flex:none; width:20px; height:20px; margin:0; }
         .menu-card .card-note { font-size:13px; color:#4f4b42; margin-top:4px; }
         .busy-overlay { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:rgba(250,249,246,.86); }
         .busy-overlay[hidden] { display:none; }
@@ -231,6 +234,7 @@
                 <p id="visitFirstHint" class="hint visit-note">はじめての方：対象メニューでは初回カウンセリング料として＋1,000円（30分）を頂いています。</p>
                 <button type="button" class="btn visit-card" data-visit-choice="returning">担当してもらったことがある</button>
             </div>
+            <p id="visitLoading" class="visit-loading" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><span>メニューを確認しています…</span></p>
         </div>
         <div id="visitSummary" class="summary" hidden><p id="visitSummaryText"></p><button id="editVisit" type="button">ご来店経験を変更</button></div>
         <p id="visitFirstNote" class="hint visit-note" hidden>対象メニューでは初回カウンセリング料として＋1,000円（30分）を頂いています。料金・所要時間は日時を選ぶと内訳で表示されます。</p>
@@ -325,7 +329,7 @@
 </div>
 
 
-<script>(function(){var B="f57bb20a9c9513d3";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="46b81c6b31af4aff";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"2010569259-TN2sWps6"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -715,7 +719,22 @@ function acceptVisit(data) {
     if (data.askVisitExperience === true && !visitExperience) { renderVisit(true); return false; }
     renderVisit(false); return true;
 }
+// While the menus of the chosen answer are fetched (a LINE page asks the server, several seconds) the question stays on
+// screen: the chosen button is marked, both are disabled and a spinner says the menus are being checked (owner 2026-11-20:
+// the page looked frozen after a tap).
+let visitBusy = false;
+function setVisitBusy(value) {
+    visitBusy = !!value;
+    const panel = document.getElementById('visitPanel');
+    panel.setAttribute('aria-busy', String(visitBusy));
+    for (const button of panel.querySelectorAll('[data-visit-choice]')) {
+        button.disabled = visitBusy;
+        button.setAttribute('aria-pressed', String(visitBusy && button.getAttribute('data-visit-choice') === value));
+    }
+    document.getElementById('visitLoading').hidden = !visitBusy;
+}
 function renderVisit(ask) {
+    setVisitBusy(null);
     document.getElementById('visitPanel').hidden = !ask;
     document.getElementById('menuPanel').setAttribute('data-visit', ask ? 'ask' : 'answered');
     document.getElementById('visitSummary').hidden = ask || !visitAsked;
@@ -725,10 +744,11 @@ function renderVisit(ask) {
     if (ask) menuDetails.textContent = 'はじめに、ご来店経験を選んでください。';
 }
 function chooseVisit(value) {
-    if (!Object.hasOwn(VISIT_LABEL, value) || submitting || completed) return;
+    if (!Object.hasOwn(VISIT_LABEL, value) || submitting || completed || visitBusy) return;
     visitExperience = value; visitAsked = true;
     menuSelect.value = ''; resetConditions(); invalidateWeek();
-    loadMenus();
+    setVisitBusy(value);
+    Promise.resolve(loadMenus()).finally(() => setVisitBusy(null));
 }
 function editVisit() {
     if (submitting || completed) return;
