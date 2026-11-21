@@ -162,6 +162,33 @@
         #customerPanel .policy-check { display:flex; align-items:center; gap:10px; min-height:48px; cursor:pointer; }
         #customerPanel .policy-check input { flex:0 0 22px; width:22px; height:22px; min-height:22px; padding:0; accent-color:#234f43; }
         #reviewDetails dd { white-space:pre-wrap; }
+        /* Phone date step (owner 2026-11-20): the whole week at a glance. The page is the only scroll (no inner
+           scroll box under the fixed dock), the header and steps shrink, rows and ◎ are smaller. Display only. */
+        @media(max-width:767px) {
+            body:has(#bookingForm[data-step="date"]) { padding-top:4px; }
+            body:has(#bookingForm[data-step="date"]) header { padding:0 0 4px; }
+            body:has(#bookingForm[data-step="date"]) h1 { font-size:16px; line-height:1.4; letter-spacing:.12em; }
+            body:has(#bookingForm[data-step="date"]) header p:not(.dev-banner) { display:none; }
+            body:has(#bookingForm[data-step="date"]) .dev-banner { margin-top:2px; padding:1px 8px; font-size:10px; line-height:1.4; }
+            #bookingForm[data-step="date"] .steps { margin-bottom:2px; font-size:11px; }
+            #bookingForm[data-step="date"] .steps li { padding:1px 2px; line-height:1.5; border-bottom-width:2px; }
+            #bookingForm[data-step="date"] .summary { font-size:13px; line-height:1.35; }
+            #bookingForm[data-step="date"] .summary button { min-height:32px; }
+            #datePanel .week-nav { height:32px; }
+            #datePanel .week-nav button { min-height:32px; font-size:24px; }
+            #datePanel .schedule-scroll { height:auto; min-height:240px; max-height:none; overflow:visible; }
+            #datePanel .schedule thead th { height:30px; line-height:1.15; font-size:11px; }
+            #datePanel .schedule th, #datePanel .schedule td { height:22px; line-height:1.2; }
+            #datePanel .schedule tbody th { font-size:11px; }
+            #datePanel .schedule button { display:block; height:22px; min-height:22px; font-size:16px; }
+            #datePanel .schedule td.multi button { height:18px; min-height:18px; font-size:13px; }
+            #datePanel .schedule td.multi button.gap-start, #datePanel .schedule td button.gap-start { font-size:11px; }
+            #datePanel .calendar-loading { inset:30px 0 0; }
+            #datePanel .date-dock { padding:4px 12px calc(4px + env(safe-area-inset-bottom)); }
+            #datePanel .date-dock .hint { margin:0 0 4px; }
+            #datePanel .date-dock .btn { min-height:40px; padding:6px; }
+            #datePanel { margin-bottom:96px; }
+        }
         .menu-set-card { display:block; width:100%; text-align:left; padding:12px 14px; margin:8px 0; background:#fff; border:1px solid #234f43; border-radius:6px; overflow-wrap:anywhere; }
         .menu-set-card span { display:block; }
         .menu-set-card .set-price { font-size:15px; font-weight:700; margin-top:2px; }
@@ -329,7 +356,7 @@
 </div>
 
 
-<script>(function(){var B="fedd8eb24700813a";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="b3a5aec7e5f1d326";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"1656751811-qc0cW4hN"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
