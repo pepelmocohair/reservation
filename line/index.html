@@ -162,6 +162,10 @@
         #customerPanel .policy-check { display:flex; align-items:center; gap:10px; min-height:48px; cursor:pointer; }
         #customerPanel .policy-check input { flex:0 0 22px; width:22px; height:22px; min-height:22px; padding:0; accent-color:#234f43; }
         #reviewDetails dd { white-space:pre-wrap; }
+        /* Today's column stands out (owner 2026-11-21). */
+        .schedule thead th.today { background:#234f43; color:#fff; font-weight:700; }
+        .schedule td.today, .schedule td.today button:not([aria-pressed="true"]) { box-shadow:inset 3px 0 0 #6fa58f, inset -3px 0 0 #6fa58f; }
+        .schedule td.today button:not([aria-pressed="true"]) { background:#eaf2ee; }
         /* Phone date step (owner 2026-11-20): the whole week at a glance. The page is the only scroll (no inner
            scroll box under the fixed dock), the header and steps shrink, rows and ◎ are smaller. Display only. */
         @media(max-width:767px) {
@@ -178,9 +182,11 @@
             #datePanel .week-nav button { min-height:32px; font-size:24px; }
             #datePanel .schedule-scroll { height:auto; min-height:240px; max-height:none; overflow:visible; }
             #datePanel .schedule thead th { height:30px; line-height:1.15; font-size:11px; }
-            #datePanel .schedule th, #datePanel .schedule td { height:22px; line-height:1.2; }
+            /* Row height follows the screen so 10:00-18:30 (18 rows, ends 19:00) stay above the dock (owner 2026-11-21). */
+            #datePanel { --row:clamp(22px, calc((100dvh - 255px) / 18 - 1px), 32px); }
+            #datePanel .schedule th, #datePanel .schedule td { height:var(--row); line-height:1.2; }
             #datePanel .schedule tbody th { font-size:11px; }
-            #datePanel .schedule button { display:block; height:22px; min-height:22px; font-size:16px; }
+            #datePanel .schedule button { display:block; height:var(--row); min-height:var(--row); font-size:clamp(16px, calc(var(--row) * .72), 21px); }
             #datePanel .schedule td.multi button { height:18px; min-height:18px; font-size:13px; }
             #datePanel .schedule td.multi button.gap-start, #datePanel .schedule td button.gap-start { font-size:11px; }
             #datePanel .calendar-loading { inset:30px 0 0; }
@@ -356,7 +362,7 @@
 </div>
 
 
-<script>(function(){var B="b3a5aec7e5f1d326";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
+<script>(function(){var B="a53a2af447bb9034";if(typeof fetch!=="function")return;var q=location.search;if(/[?&](code|state|liff\.[a-z]+|error)=/.test(q))return;fetch("version.json",{cache:"no-cache",credentials:"omit"}).then(function(r){return r.ok?r.json():null;}).then(function(v){if(!v||typeof v.build!=="string"||!/^[0-9a-f]{16}$/.test(v.build)||v.build===B)return;var k="pepel-page-reload:"+v.build;try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(_){return;}location.replace(location.pathname+"?v="+v.build+location.hash);}).catch(function(){});})();</script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>window.PepelLine={idToken:null,ready:null};PepelLine.ready=(typeof liff==="undefined"?Promise.resolve():liff.init({liffId:"1656751811-qc0cW4hN"}).then(function(){if(!liff.isLoggedIn()){if(true||liff.isInClient())liff.login();return;}PepelLine.idToken=liff.getIDToken();}).catch(function(){}));</script>
 <script>
@@ -1740,10 +1746,10 @@ function addDays(date, days) {
 }
 // The first day of the 7-day block holding date. Audit C-15: blocks start on the first bookable day (today), not on
 // Monday, so the week grid never opens with past days greyed out. (The name is kept for its many callers.)
+// Weeks run Monday to Sunday (owner 2026-11-21); days before today in the current week are shown as past.
 function mondayOf(date) {
-    const base = typeof dateInput !== 'undefined' && dateInput && dateInput.min || date;
-    const diff = Math.round((Date.parse(date + 'T00:00:00Z') - Date.parse(base + 'T00:00:00Z')) / 86400000);
-    return addDays(base, Math.floor(diff / 7) * 7);
+    const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
+    return addDays(date, -((weekday + 6) % 7));
 }
 function invalidateWeek() {
     document.getElementById('calendarLoading').hidden = true;
@@ -1782,6 +1788,7 @@ function renderWeek() {
         const th = document.createElement('th'); th.setAttribute('scope','col');
         const weekdayIndex = new Date(day.date + 'T00:00:00Z').getUTCDay();
         th.className = weekdayIndex === 6 ? 'saturday' : weekdayIndex === 0 ? 'sunday' : '';
+        if (day.date === dateInput.min) { th.classList.add('today'); th.setAttribute('aria-label', day.date.slice(5).replace('-','/') + ' 今日'); }
         const weekday = ['日','月','火','水','木','金','土'][weekdayIndex];
         const dateLabel = document.createElement('span'); dateLabel.className = 'schedule-date';
         dateLabel.textContent = day.date.slice(5).replace('-','/');
@@ -1815,7 +1822,7 @@ function renderWeek() {
             const closed = !past && day.data && day.data.isClosed && ['regular','other'].includes(day.data.closedKind);
             if (closed) {
                 if (rowIndex === 0) {
-                    cell.className = 'unavailable closed-day'; cell.rowSpan = labels.length;
+                    cell.className = 'unavailable closed-day' + (day.date === dateInput.min ? ' today' : ''); cell.rowSpan = labels.length;
                     const label = day.data.closedKind === 'regular' ? '定休日' : '休業日';
                     cell.textContent = label;
                     cell.setAttribute('aria-label',day.date + ' ' + label + 'のため予約不可');
@@ -1844,14 +1851,28 @@ function renderWeek() {
                 cell.textContent = waiting ? '' : past || day.data ? '' : day.error ? '再取得' : '…';
                 cell.setAttribute('aria-label',day.date + ' ' + time + (past ? ' 過去日のため予約不可' : waiting ? ' 条件の選択待ち' : day.data ? ' 予約不可' : day.error ? ' 取得失敗' : ' 取得中'));
             }
+            if (day.date === dateInput.min) cell.classList.add('today');
             row.appendChild(cell);
         });
         body.appendChild(row);
     });
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fitWeekRows);
     table.appendChild(body);
     renderConditions();
     renderFlow(); // the summary may now show the week's uniform evaluation
 }
+// Phones: size the rows so the whole day (10:00-18:30, ends 19:00) stays above the fixed dock, ◎ as large as fits
+// (owner 2026-11-21). Display only; the CSS --row is the fallback.
+function fitWeekRows() {
+    const panel = document.getElementById('datePanel'), table = document.getElementById('schedule');
+    if (!panel || !table) return;
+    const dock = panel.querySelector('.date-dock'), rows = table.tBodies[0] ? table.tBodies[0].rows.length : 0;
+    if (panel.hidden || !dock || rows < 2 || !window.matchMedia || !window.matchMedia('(max-width:767px)').matches) { panel.style.removeProperty('--row'); return; }
+    const top = table.getBoundingClientRect().top + window.scrollY, head = table.tHead ? table.tHead.getBoundingClientRect().height : 30;
+    const room = dock.getBoundingClientRect().top - top - head - 6;
+    panel.style.setProperty('--row', Math.max(22, Math.min(32, Math.floor(room / rows) - 1)) + 'px');
+}
+window.addEventListener('resize', () => fitWeekRows());
 function selectWeekSlot(date, time, version) {
     return recheckWeekSlot(date, time, version);
 }
@@ -1937,6 +1958,7 @@ async function loadWeek(retryFailed = false) {
             document.getElementById('weekStatus').textContent = failed ? '取得できない日があります。再取得してください。' :
                 weekDays.some(day=>day.date >= dateInput.min && day.data && !day.data.isClosed && day.data.availableStartTimes.length) ?
                 '' : weekConditionMessage() || 'この7日間は予約できる時間がありません。';
+            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fitWeekRows);
             document.getElementById('retryWeek').hidden = !failed;
         }
     }
